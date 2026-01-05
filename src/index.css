@@ -2,95 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Kotaemon Design System - Light Theme */
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 222.2 47.4% 11.2%;
+    /* Deep blue primary for trust */
+    --primary: 222 47% 20%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Subtle secondary */
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 214 32% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Teal accent for actions */
+    --accent: 172 66% 40%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Warning for admin actions */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    /* Success for confirmations */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
 
-    --sidebar-background: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 172 66% 40%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --radius: 0.75rem;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Sidebar */
+    --sidebar-background: 220 20% 97%;
+    --sidebar-foreground: 222 47% 20%;
+    --sidebar-primary: 222 47% 20%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 172 66% 95%;
+    --sidebar-accent-foreground: 172 66% 30%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 172 66% 40%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Chat specific */
+    --chat-user-bg: 172 66% 95%;
+    --chat-user-fg: 172 66% 20%;
+    --chat-assistant-bg: 0 0% 100%;
+    --chat-assistant-fg: 222 47% 11%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    /* Sources panel */
+    --sources-bg: 214 32% 98%;
+    --sources-border: 214 32% 88%;
+    --citation-bg: 0 0% 100%;
+    --citation-border: 172 66% 70%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    /* Admin specific */
+    --admin-bg: 38 100% 98%;
+    --admin-border: 38 60% 80%;
+    --admin-accent: 38 92% 50%;
 
-    --sidebar-border: 220 13% 91%;
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(222 47% 20%), hsl(222 47% 35%));
+    --gradient-accent: linear-gradient(135deg, hsl(172 66% 40%), hsl(172 66% 50%));
+    --gradient-sidebar: linear-gradient(180deg, hsl(220 20% 97%), hsl(220 20% 95%));
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-glow: 0 0 20px hsl(172 66% 40% / 0.3);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 222 47% 8%;
+    --foreground: 210 40% 96%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 172 66% 50%;
+    --primary-foreground: 222 47% 8%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 172 66% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 63% 45%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --success: 142 76% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 172 66% 50%;
+
+    /* Sidebar dark */
+    --sidebar-background: 222 47% 10%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 172 66% 50%;
+    --sidebar-primary-foreground: 222 47% 8%;
+    --sidebar-accent: 172 66% 20%;
+    --sidebar-accent-foreground: 172 66% 70%;
+    --sidebar-border: 217 33% 20%;
+    --sidebar-ring: 172 66% 50%;
+
+    /* Chat dark */
+    --chat-user-bg: 172 66% 15%;
+    --chat-user-fg: 172 66% 90%;
+    --chat-assistant-bg: 222 47% 13%;
+    --chat-assistant-fg: 210 40% 96%;
+
+    /* Sources dark */
+    --sources-bg: 222 47% 10%;
+    --sources-border: 217 33% 25%;
+    --citation-bg: 222 47% 13%;
+    --citation-border: 172 66% 40%;
+
+    /* Admin dark */
+    --admin-bg: 38 40% 12%;
+    --admin-border: 38 40% 25%;
+    --admin-accent: 38 92% 55%;
+
+    /* Gradients dark */
+    --gradient-primary: linear-gradient(135deg, hsl(172 66% 40%), hsl(172 66% 50%));
+    --gradient-accent: linear-gradient(135deg, hsl(172 66% 50%), hsl(172 66% 60%));
+    --gradient-sidebar: linear-gradient(180deg, hsl(222 47% 10%), hsl(222 47% 8%));
+
+    /* Shadows dark */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+    --shadow-glow: 0 0 25px hsl(172 66% 50% / 0.4);
   }
 }
 
@@ -99,7 +169,162 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply backdrop-blur-md bg-background/80 border border-border/50;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-accent);
+  }
+
+  /* Pulse animation for online indicator */
+  .pulse-online {
+    @apply relative;
+  }
+
+  .pulse-online::after {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-success animate-ping opacity-75;
+  }
+
+  /* Message animation */
+  .message-enter {
+    animation: messageSlideIn 0.3s ease-out forwards;
+  }
+
+  @keyframes messageSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Typing indicator */
+  .typing-dot {
+    @apply w-2 h-2 rounded-full bg-muted-foreground;
+    animation: typingBounce 1.4s infinite ease-in-out;
+  }
+
+  .typing-dot:nth-child(1) {
+    animation-delay: -0.32s;
+  }
+
+  .typing-dot:nth-child(2) {
+    animation-delay: -0.16s;
+  }
+
+  @keyframes typingBounce {
+    0%, 80%, 100% {
+      transform: scale(0.6);
+      opacity: 0.5;
+    }
+    40% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Admin warning banner */
+  .admin-warning {
+    @apply bg-warning/10 border border-warning/30 text-warning rounded-lg p-4;
+  }
+
+  /* Citation card */
+  .citation-card {
+    @apply bg-citation-bg border-l-4 border-citation-border rounded-lg p-3 shadow-sm;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .citation-card:hover {
+    @apply shadow-md;
+    transform: translateX(2px);
+  }
+
+  /* Code block styling */
+  .code-block {
+    @apply bg-secondary rounded-lg overflow-hidden;
+  }
+
+  .code-block pre {
+    @apply p-4 overflow-x-auto text-sm;
+  }
+
+  /* Skeleton shimmer */
+  .skeleton-shimmer {
+    @apply relative overflow-hidden bg-muted;
+  }
+
+  .skeleton-shimmer::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--background) / 0.4),
+      transparent
+    );
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+@layer utilities {
+  /* Focus visible outline */
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Safe area insets for mobile */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
   }
 }
