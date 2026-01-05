@@ -63,6 +63,7 @@ export interface DocUploadResponse {
 
 export interface Project {
   id: string;
+  userId: string;
   name: string;
   description?: string;
   color?: string;
@@ -85,6 +86,7 @@ export interface ProjectCreate {
 
 export interface Conversation {
   id: string;
+  userId: string;
   title: string;
   createdAt: string;
   updatedAt: string;

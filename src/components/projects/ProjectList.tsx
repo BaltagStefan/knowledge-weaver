@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useProjectsStore, useConversationsStore } from '@/store/appStore';
+import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,8 +53,14 @@ interface ProjectListProps {
 
 export function ProjectList({ onConversationClick }: ProjectListProps) {
   const { t } = useTranslation();
-  const { projects, currentProjectId, setCurrentProject, addProject, updateProject, removeProject } = useProjectsStore();
-  const { conversations } = useConversationsStore();
+  const { projects, currentProjectId, setCurrentProject, addProject, updateProject, removeProject, getProjectsForUser } = useProjectsStore();
+  const { conversations, getConversationsForUser } = useConversationsStore();
+  const { user } = useAuthStore();
+  
+  // Filter projects and conversations for current user
+  const userProjects = user ? getProjectsForUser(user.id) : [];
+  const userConversations = user ? getConversationsForUser(user.id) : [];
+  
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -69,10 +76,11 @@ export function ProjectList({ onConversationClick }: ProjectListProps) {
   };
 
   const handleCreate = () => {
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim() || !user) return;
 
     const newProject: Project = {
       id: `proj-${Date.now()}`,
+      userId: user.id,
       name: formData.name.trim(),
       description: formData.description.trim() || undefined,
       color: formData.color,
@@ -126,10 +134,10 @@ export function ProjectList({ onConversationClick }: ProjectListProps) {
   };
 
   const getProjectConversations = (projectId: string) => {
-    return conversations.filter((c) => c.projectId === projectId);
+    return userConversations.filter((c) => c.projectId === projectId);
   };
 
-  if (projects.length === 0) {
+  if (userProjects.length === 0) {
     return (
       <div className="px-3 py-2">
         <Button
@@ -171,7 +179,7 @@ export function ProjectList({ onConversationClick }: ProjectListProps) {
       </Button>
 
       {/* Projects list */}
-      {projects.map((project) => {
+      {userProjects.map((project) => {
         const projectConversations = getProjectConversations(project.id);
         const isExpanded = expandedProjects.has(project.id);
 
