@@ -45,7 +45,13 @@ export function WorkspaceSwitcher() {
 
   const { workspaces, currentWorkspace, currentWorkspaceId, setCurrentWorkspace, addWorkspace } =
     useWorkspaceStore();
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, user } = useAuthStore();
+
+  // Filter workspaces to only show those the user is assigned to
+  // Admins can see all workspaces
+  const userWorkspaces = isAdmin()
+    ? workspaces
+    : workspaces.filter((ws) => user?.workspaceIds?.includes(ws.id));
 
   const handleSelect = (workspaceId: string) => {
     setCurrentWorkspace(workspaceId);
@@ -106,7 +112,7 @@ export function WorkspaceSwitcher() {
             <CommandList>
               <CommandEmpty>Niciun workspace găsit.</CommandEmpty>
               <CommandGroup heading="Workspaces">
-                {workspaces.map((workspace) => (
+                {userWorkspaces.map((workspace) => (
                   <CommandItem
                     key={workspace.id}
                     value={workspace.name}
