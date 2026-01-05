@@ -1,20 +1,25 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useChatStore, useUIStore } from '@/store/appStore';
 import { streamChat } from '@/api';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { StreamingStatus } from '@/components/chat/StreamingStatus';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { ScrollToBottom } from '@/components/chat/ScrollToBottom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquarePlus, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { MessageSquarePlus, PanelRightOpen, PanelRightClose, Sparkles } from 'lucide-react';
 import type { Message } from '@/types';
 
 export default function ChatPage() {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { sourcesPanelOpen, toggleSourcesPanel } = useUIStore();
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   
   const {
     messages,
@@ -38,6 +43,21 @@ export default function ChatPage() {
     }, 100);
   }, []);
 
+  // Track scroll position for scroll-to-bottom button
+  useEffect(() => {
+    const scrollArea = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollArea) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollArea;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+      setShowScrollButton(!isNearBottom && messages.length > 0);
+    };
+
+    scrollArea.addEventListener('scroll', handleScroll);
+    return () => scrollArea.removeEventListener('scroll', handleScroll);
+  }, [messages.length]);
+
   const handleSend = useCallback(async (content: string) => {
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
@@ -48,6 +68,9 @@ export default function ChatPage() {
     };
     addMessage(userMessage);
     scrollToBottom();
+
+    // Show typing indicator briefly before streaming starts
+    setIsTyping(true);
 
     const abortController = new AbortController();
     startStreaming(abortController);
@@ -65,6 +88,7 @@ export default function ChatPage() {
       },
       {
         onToken: (text) => {
+          setIsTyping(false);
           appendStreamingText(text);
           scrollToBottom();
         },
@@ -75,6 +99,7 @@ export default function ChatPage() {
           setStreamingStatus(status);
         },
         onDone: (messageId, finalText) => {
+          setIsTyping(false);
           const assistantMessage: Message = {
             id: messageId,
             conversationId: currentConversationId || 'temp',
@@ -87,6 +112,7 @@ export default function ChatPage() {
           scrollToBottom();
         },
         onError: (error) => {
+          setIsTyping(false);
           stopStreaming();
           
           if (error.status === 429) {
@@ -112,18 +138,29 @@ export default function ChatPage() {
     stopStreaming, setCitations, scrollToBottom, t
   ]);
 
+  const handleRegenerate = useCallback(() => {
+    // Get last user message and resend
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+    if (lastUserMessage) {
+      handleSend(lastUserMessage.content);
+    }
+  }, [messages, handleSend]);
+
   const showEmptyState = messages.length === 0 && !isStreaming;
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-background">
       {/* Header */}
       <header className="flex items-center justify-between h-14 px-6 border-b bg-white dark:bg-background shrink-0">
-        <h1 className="font-medium text-foreground">{t('nav.chat')}</h1>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <h1 className="font-medium text-foreground">{t('nav.chat')}</h1>
+        </div>
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleSourcesPanel}
-          className="hidden lg:flex"
+          className="hidden lg:flex hover:bg-muted transition-colors"
         >
           {sourcesPanelOpen ? (
             <PanelRightClose className="h-4 w-4" />
@@ -134,10 +171,10 @@ export default function ChatPage() {
       </header>
 
       {/* Messages area */}
-      <ScrollArea className="flex-1 bg-[#f7f7f8] dark:bg-muted/20">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 bg-[#f7f7f8] dark:bg-muted/20">
         {showEmptyState ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[500px] p-8 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+          <div className="flex flex-col items-center justify-center h-full min-h-[500px] p-8 text-center animate-fade-in">
+            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 animate-bounce-subtle">
               <MessageSquarePlus className="h-10 w-10 text-primary" />
             </div>
             <h2 className="text-2xl font-semibold mb-3 text-foreground">{t('chat.emptyState')}</h2>
@@ -147,9 +184,17 @@ export default function ChatPage() {
           </div>
         ) : (
           <div>
-            {messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} />
+            {messages.map((msg, index) => (
+              <ChatMessage 
+                key={msg.id} 
+                message={msg}
+                onRegenerate={msg.role === 'assistant' && index === messages.length - 1 ? handleRegenerate : undefined}
+              />
             ))}
+            
+            {isTyping && !streamingText && (
+              <TypingIndicator />
+            )}
             
             {isStreaming && streamingText && (
               <ChatMessage
@@ -170,6 +215,12 @@ export default function ChatPage() {
           </div>
         )}
       </ScrollArea>
+
+      {/* Scroll to bottom button */}
+      <ScrollToBottom 
+        visible={showScrollButton} 
+        onClick={scrollToBottom}
+      />
 
       {/* Composer */}
       <ChatComposer onSend={handleSend} />

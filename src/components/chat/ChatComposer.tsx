@@ -13,6 +13,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { QuickSuggestions } from './QuickSuggestions';
 import { cn } from '@/lib/utils';
 import {
   Send,
@@ -25,9 +26,10 @@ import {
 interface ChatComposerProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  showSuggestions?: boolean;
 }
 
-export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
+export function ChatComposer({ onSend, disabled = false, showSuggestions = true }: ChatComposerProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState('');
@@ -40,10 +42,12 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
     setSourceSettings,
     selectedDocIds,
     setSelectedDocIds,
+    messages,
   } = useChatStore();
   
   const { docs } = useDocsStore();
   const readyDocs = docs.filter(d => d.status === 'ready');
+  const showQuickSuggestions = showSuggestions && messages.length === 0 && !message;
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -52,6 +56,19 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
     }
   }, [message]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to stop streaming
+      if (e.key === 'Escape' && isStreaming) {
+        stopStreaming();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isStreaming, stopStreaming]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -81,6 +98,12 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
     }
   }, [handleSend]);
 
+  const handleSuggestionSelect = useCallback((suggestion: string) => {
+    setMessage(suggestion);
+    setValidation(validateMessage(suggestion));
+    textareaRef.current?.focus();
+  }, []);
+
   const toggleDocSelection = (docId: string) => {
     setSelectedDocIds(
       selectedDocIds.includes(docId)
@@ -92,6 +115,13 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
   return (
     <div className="border-t bg-background">
       <div className="max-w-3xl mx-auto p-4">
+        {/* Quick Suggestions */}
+        {showQuickSuggestions && (
+          <div className="mb-4">
+            <QuickSuggestions onSelect={handleSuggestionSelect} />
+          </div>
+        )}
+
         {/* Source settings */}
         <div className="flex items-center gap-4 mb-3 flex-wrap">
           <div className="flex items-center gap-2">
@@ -105,7 +135,7 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
             />
             <Label 
               htmlFor="use-pdfs" 
-              className="text-sm cursor-pointer flex items-center gap-1.5 text-muted-foreground"
+              className="text-sm cursor-pointer flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
             >
               <FileText className="h-3.5 w-3.5" />
               {t('sources.usePdfs')}
@@ -123,7 +153,7 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
             />
             <Label 
               htmlFor="use-memory" 
-              className="text-sm cursor-pointer flex items-center gap-1.5 text-muted-foreground"
+              className="text-sm cursor-pointer flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
             >
               <Brain className="h-3.5 w-3.5" />
               {t('sources.useMemory')}
@@ -133,7 +163,11 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
           {sourceSettings.usePdfs && readyDocs.length > 0 && (
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-muted-foreground">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                >
                   <FileText className="h-3.5 w-3.5" />
                   {selectedDocIds.length > 0 
                     ? `${selectedDocIds.length} ${t('common.selected')}`
@@ -148,7 +182,7 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
                     {readyDocs.map((doc) => (
                       <div
                         key={doc.id}
-                        className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer"
+                        className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer transition-colors"
                         onClick={() => toggleDocSelection(doc.id)}
                       >
                         <Checkbox checked={selectedDocIds.includes(doc.id)} />
@@ -174,7 +208,7 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
               disabled={disabled}
               className={cn(
                 "min-h-[52px] max-h-[200px] resize-none pr-16 py-3 rounded-xl border-2",
-                "focus-visible:ring-0 focus-visible:border-primary",
+                "focus-visible:ring-0 focus-visible:border-primary transition-all duration-200",
                 !validation.isValid && message.length > 0 && "border-destructive"
               )}
               rows={1}
@@ -194,10 +228,10 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
             disabled={!isStreaming && (!validation.isValid || disabled)}
             size="icon"
             className={cn(
-              "h-[52px] w-[52px] rounded-xl shrink-0",
+              "h-[52px] w-[52px] rounded-xl shrink-0 transition-all duration-200",
               isStreaming 
                 ? "bg-destructive hover:bg-destructive/90" 
-                : "bg-primary hover:bg-primary/90"
+                : "bg-primary hover:bg-primary/90 hover:scale-105"
             )}
             aria-label={isStreaming ? t('chat.stop') : t('chat.send')}
           >
@@ -208,6 +242,15 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
             )}
           </Button>
         </div>
+
+        {/* Keyboard hint */}
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> pentru trimitere • 
+          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono ml-1">Shift+Enter</kbd> pentru linie nouă
+          {isStreaming && (
+            <> • <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">Esc</kbd> pentru oprire</>
+          )}
+        </p>
       </div>
     </div>
   );
