@@ -35,6 +35,8 @@ import {
   Cpu,
   LogOut,
   Shield,
+  ChevronRight,
+  Home,
 } from 'lucide-react';
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
@@ -250,13 +252,56 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   );
 }
 
+function getBreadcrumbs(pathname: string, workspaceId: string, t: (key: string) => string) {
+  const segments = pathname.split('/').filter(Boolean);
+  const breadcrumbs: { label: string; path: string; icon?: React.ComponentType<{ className?: string }> }[] = [];
+
+  // Home/Workspace
+  breadcrumbs.push({ label: 'Workspace', path: `/w/${workspaceId}/chat`, icon: Home });
+
+  if (segments.includes('settings')) {
+    breadcrumbs.push({ label: 'Setări', path: `/w/${workspaceId}/settings/prompt`, icon: Settings });
+    
+    if (segments.includes('prompt')) {
+      breadcrumbs.push({ label: t('nav.settingsPrompt'), path: `/w/${workspaceId}/settings/prompt` });
+    } else if (segments.includes('models')) {
+      breadcrumbs.push({ label: t('nav.settingsModels'), path: `/w/${workspaceId}/settings/models` });
+    } else if (segments.includes('rag')) {
+      breadcrumbs.push({ label: t('nav.settingsRag'), path: `/w/${workspaceId}/settings/rag` });
+    }
+  } else if (segments.includes('workspace-users')) {
+    breadcrumbs.push({ label: 'Setări', path: `/w/${workspaceId}/settings/prompt`, icon: Settings });
+    breadcrumbs.push({ label: 'Utilizatori', path: `/w/${workspaceId}/workspace-users` });
+  } else if (segments.includes('admin')) {
+    breadcrumbs.push({ label: 'Admin', path: '/admin/workspaces', icon: Shield });
+    
+    if (segments.includes('workspaces')) {
+      breadcrumbs.push({ label: t('nav.adminWorkspaces'), path: '/admin/workspaces' });
+    } else if (segments.includes('users')) {
+      breadcrumbs.push({ label: t('nav.adminUsers'), path: '/admin/users' });
+    } else if (segments.includes('memory')) {
+      breadcrumbs.push({ label: 'Memorie', path: '/admin/memory' });
+    }
+  } else if (segments.includes('files')) {
+    breadcrumbs.push({ label: t('nav.files'), path: `/w/${workspaceId}/files`, icon: FolderOpen });
+  } else if (segments.includes('conversations')) {
+    breadcrumbs.push({ label: t('nav.conversations'), path: `/w/${workspaceId}/conversations`, icon: History });
+  } else if (segments.includes('chat')) {
+    breadcrumbs.push({ label: t('nav.chat'), path: `/w/${workspaceId}/chat`, icon: MessageSquare });
+  }
+
+  return breadcrumbs;
+}
+
 function TopNavBar() {
   const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId?: string }>();
+  const location = useLocation();
   const { currentWorkspaceId } = useWorkspaceStore();
   const { isAdmin, isUserPlus } = useAuthStore();
   
   const effectiveWorkspaceId = workspaceId || currentWorkspaceId || 'default';
+  const breadcrumbs = getBreadcrumbs(location.pathname, effectiveWorkspaceId, t);
 
   // Workspace settings items for User+ and Admin
   const workspaceSettingsItems = [
@@ -280,76 +325,102 @@ function TopNavBar() {
   if (!isUserPlus && !isAdmin) return null;
 
   return (
-    <header className="h-12 border-b bg-white dark:bg-card flex items-center px-4 gap-1">
-      {/* Workspace Settings - User+ and Admin */}
-      {(isUserPlus || isAdmin) && (
-        <>
-          <div className="flex items-center gap-1 mr-2">
-            <Settings className="h-4 w-4 text-muted-foreground mr-1" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">
-              Setări
-            </span>
-            {workspaceSettingsItems.map((item) => (
-              <NavLink
-                key={item.key}
-                to={item.path}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
-                  isActive 
-                    ? "bg-primary/10 text-primary font-medium" 
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{item.label}</span>
-              </NavLink>
-            ))}
-            {isAdmin && adminWorkspaceSettings.map((item) => (
-              <NavLink
-                key={item.key}
-                to={item.path}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
-                  isActive 
-                    ? "bg-primary/10 text-primary font-medium" 
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{item.label}</span>
-              </NavLink>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Separator */}
-      {isAdmin && <div className="w-px h-6 bg-border mx-2" />}
-
-      {/* Admin Panel - Admin only */}
-      {isAdmin && (
-        <div className="flex items-center gap-1">
-          <Shield className="h-4 w-4 text-muted-foreground mr-1" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">
-            Admin
-          </span>
-          {adminNavItems.map((item) => (
-            <NavLink
-              key={item.key}
-              to={item.path}
-              className={({ isActive }) => cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
-                isActive 
-                  ? "bg-primary/10 text-primary font-medium" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+    <header className="border-b bg-gradient-to-r from-slate-50 to-gray-50 dark:from-card dark:to-card/80">
+      {/* Breadcrumbs Row */}
+      <div className="h-10 px-5 flex items-center border-b border-border/50">
+        <nav className="flex items-center gap-1 text-sm">
+          {breadcrumbs.map((crumb, index) => (
+            <React.Fragment key={crumb.path + index}>
+              {index > 0 && (
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 mx-1" />
               )}
-            >
-              <item.icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{item.label}</span>
-            </NavLink>
+              <NavLink
+                to={crumb.path}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200",
+                  index === breadcrumbs.length - 1
+                    ? "text-foreground font-medium bg-white dark:bg-white/10 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-white/5"
+                )}
+              >
+                {crumb.icon && <crumb.icon className="h-3.5 w-3.5" />}
+                <span>{crumb.label}</span>
+              </NavLink>
+            </React.Fragment>
           ))}
-        </div>
-      )}
+        </nav>
+      </div>
+
+      {/* Navigation Tabs Row */}
+      <div className="h-11 px-5 flex items-center gap-6">
+        {/* Workspace Settings - User+ and Admin */}
+        {(isUserPlus || isAdmin) && (
+          <div className="flex items-center">
+            <div className="flex items-center gap-0.5 bg-white dark:bg-white/5 rounded-lg p-1 shadow-sm border border-border/40">
+              {workspaceSettingsItems.map((item) => (
+                <NavLink
+                  key={item.key}
+                  to={item.path}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
+                    isActive 
+                      ? "bg-primary text-primary-foreground shadow-sm" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className="hidden md:inline">{item.label}</span>
+                </NavLink>
+              ))}
+              {isAdmin && adminWorkspaceSettings.map((item) => (
+                <NavLink
+                  key={item.key}
+                  to={item.path}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
+                    isActive 
+                      ? "bg-primary text-primary-foreground shadow-sm" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className="hidden md:inline">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Admin Panel - Admin only */}
+        {isAdmin && (
+          <>
+            <div className="h-5 w-px bg-border/60" />
+            <div className="flex items-center">
+              <div className="flex items-center gap-0.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-1 shadow-sm border border-amber-200/50 dark:border-amber-800/30">
+                <div className="flex items-center gap-1.5 px-2 py-1">
+                  <Shield className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 hidden lg:inline">ADMIN</span>
+                </div>
+                {adminNavItems.map((item) => (
+                  <NavLink
+                    key={item.key}
+                    to={item.path}
+                    className={({ isActive }) => cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
+                      isActive 
+                        ? "bg-amber-500 text-white shadow-sm" 
+                        : "text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span className="hidden md:inline">{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </header>
   );
 }
