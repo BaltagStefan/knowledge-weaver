@@ -474,10 +474,13 @@ export function MainLayout() {
 
           {/* Live Reasoning panel */}
           {showSourcesPanel && (
-            <aside className="fixed right-0 top-0 bottom-0 w-80 border-l bg-white dark:bg-card hidden lg:block">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="font-semibold">{t('reasoning.title')}</h2>
-                <Button variant="ghost" size="icon" onClick={toggleSourcesPanel}>
+            <aside className={cn(
+              "fixed right-0 bottom-0 w-80 border-l bg-white dark:bg-card hidden lg:block",
+              showTopNav ? "top-[84px]" : "top-0"
+            )}>
+              <div className="flex items-center justify-between p-3 border-b">
+                <h2 className="font-semibold text-sm">{t('reasoning.title')}</h2>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleSourcesPanel}>
                   <PanelRightClose className="h-4 w-4" />
                 </Button>
               </div>
