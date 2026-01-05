@@ -255,26 +255,35 @@ interface ConversationsState {
   updateConversation: (id: string, updates: Partial<Conversation>) => void;
   removeConversation: (id: string) => void;
   moveToProject: (conversationId: string, projectId: string | null) => void;
+  getConversationsForUser: (userId: string) => Conversation[];
 }
 
-export const useConversationsStore = create<ConversationsState>()((set) => ({
-  conversations: [],
-  setConversations: (conversations) => set({ conversations }),
-  addConversation: (conversation) => set((state) => ({ 
-    conversations: [conversation, ...state.conversations] 
-  })),
-  updateConversation: (id, updates) => set((state) => ({
-    conversations: state.conversations.map((c) => c.id === id ? { ...c, ...updates } : c)
-  })),
-  removeConversation: (id) => set((state) => ({
-    conversations: state.conversations.filter((c) => c.id !== id)
-  })),
-  moveToProject: (conversationId, projectId) => set((state) => ({
-    conversations: state.conversations.map((c) => 
-      c.id === conversationId ? { ...c, projectId: projectId || undefined } : c
-    )
-  })),
-}));
+export const useConversationsStore = create<ConversationsState>()(
+  persist(
+    (set, get) => ({
+      conversations: [],
+      setConversations: (conversations) => set({ conversations }),
+      addConversation: (conversation) => set((state) => ({ 
+        conversations: [conversation, ...state.conversations] 
+      })),
+      updateConversation: (id, updates) => set((state) => ({
+        conversations: state.conversations.map((c) => c.id === id ? { ...c, ...updates } : c)
+      })),
+      removeConversation: (id) => set((state) => ({
+        conversations: state.conversations.filter((c) => c.id !== id)
+      })),
+      moveToProject: (conversationId, projectId) => set((state) => ({
+        conversations: state.conversations.map((c) => 
+          c.id === conversationId ? { ...c, projectId: projectId || undefined } : c
+        )
+      })),
+      getConversationsForUser: (userId) => get().conversations.filter((c) => c.userId === userId),
+    }),
+    {
+      name: 'kotaemon-conversations',
+    }
+  )
+);
 
 // ============================================
 // Projects Store
@@ -288,11 +297,12 @@ interface ProjectsState {
   updateProject: (id: string, updates: Partial<Project>) => void;
   removeProject: (id: string) => void;
   setCurrentProject: (id: string | null) => void;
+  getProjectsForUser: (userId: string) => Project[];
 }
 
 export const useProjectsStore = create<ProjectsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       projects: [],
       currentProjectId: null,
       setProjects: (projects) => set({ projects }),
@@ -307,6 +317,7 @@ export const useProjectsStore = create<ProjectsState>()(
         currentProjectId: state.currentProjectId === id ? null : state.currentProjectId
       })),
       setCurrentProject: (currentProjectId) => set({ currentProjectId }),
+      getProjectsForUser: (userId) => get().projects.filter((p) => p.userId === userId),
     }),
     {
       name: 'kotaemon-projects',

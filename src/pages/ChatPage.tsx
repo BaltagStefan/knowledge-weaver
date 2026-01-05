@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useChatStore, useUIStore, useConversationsStore, useProjectsStore } from '@/store/appStore';
+import { useAuthStore } from '@/store/authStore';
 import { streamChat } from '@/api';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
@@ -39,10 +40,12 @@ export default function ChatPage() {
     setCurrentConversation,
   } = useChatStore();
 
-  const { currentProjectId, projects } = useProjectsStore();
-  const { addConversation } = useConversationsStore();
+  const { currentProjectId, projects, getProjectsForUser } = useProjectsStore();
+  const { addConversation, getConversationsForUser } = useConversationsStore();
+  const { user } = useAuthStore();
 
-  const currentProject = projects.find(p => p.id === currentProjectId);
+  const userProjects = user ? getProjectsForUser(user.id) : [];
+  const currentProject = userProjects.find(p => p.id === currentProjectId);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -72,6 +75,7 @@ export default function ChatPage() {
       convId = `conv-${Date.now()}`;
       const newConversation = {
         id: convId,
+        userId: user?.id || '',
         title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
