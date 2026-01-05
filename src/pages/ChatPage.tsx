@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useChatStore, useUIStore, useConversationsStore } from '@/store/appStore';
+import { useChatStore, useUIStore, useConversationsStore, useProjectsStore } from '@/store/appStore';
 import { streamChat } from '@/api';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
@@ -36,7 +36,11 @@ export default function ChatPage() {
     appendStreamingText,
     stopStreaming,
     setCitations,
+    setCurrentConversation,
   } = useChatStore();
+
+  const { currentProjectId } = useProjectsStore();
+  const { addConversation } = useConversationsStore();
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -60,9 +64,25 @@ export default function ChatPage() {
   }, [messages.length]);
 
   const handleSend = useCallback(async (content: string) => {
+    // Create new conversation if none exists
+    let convId = currentConversationId;
+    if (!convId) {
+      convId = `conv-${Date.now()}`;
+      const newConversation = {
+        id: convId,
+        title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageCount: 0,
+        projectId: currentProjectId || undefined,
+      };
+      addConversation(newConversation);
+      setCurrentConversation(convId);
+    }
+
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
-      conversationId: currentConversationId || 'temp',
+      conversationId: convId,
       role: 'user',
       content,
       createdAt: new Date().toISOString(),
@@ -134,9 +154,9 @@ export default function ChatPage() {
       abortController
     );
   }, [
-    currentConversationId, sourceSettings, selectedDocIds, ragSettings,
-    addMessage, startStreaming, setStreamingStatus, appendStreamingText,
-    stopStreaming, setCitations, scrollToBottom, t
+    currentConversationId, currentProjectId, sourceSettings, selectedDocIds, ragSettings,
+    addMessage, addConversation, setCurrentConversation, startStreaming, setStreamingStatus, 
+    appendStreamingText, stopStreaming, setCitations, scrollToBottom, t
   ]);
 
   const handleRegenerate = useCallback(() => {
