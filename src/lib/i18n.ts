@@ -89,6 +89,20 @@ const translations: Record<Language, Translations> = {
       model: 'Model',
       latency: 'Latență',
       chunks: 'Fragmente',
+      copy: 'Copiază',
+      copied: 'Copiat în clipboard!',
+      edit: 'Editează mesajul',
+      helpful: 'Răspuns util',
+      notHelpful: 'Răspuns neutil',
+      feedbackThanks: 'Mulțumim pentru feedback!',
+    },
+    
+    // Quick Suggestions
+    suggestions: {
+      summarize: 'Rezumă acest document',
+      findInfo: 'Găsește informații despre...',
+      explain: 'Explică-mi conceptul de...',
+      compare: 'Compară diferențele dintre...',
     },
     
     // Sources
@@ -264,6 +278,7 @@ const translations: Record<Language, Translations> = {
       seconds: 'secunde',
       payloadTooLarge: 'Fișierul este prea mare',
       validationError: 'Date invalide',
+      copyFailed: 'Nu am putut copia în clipboard',
     },
     
     // Accessibility
@@ -357,6 +372,20 @@ const translations: Record<Language, Translations> = {
       model: 'Model',
       latency: 'Latency',
       chunks: 'Chunks',
+      copy: 'Copy',
+      copied: 'Copied to clipboard!',
+      edit: 'Edit message',
+      helpful: 'Helpful response',
+      notHelpful: 'Not helpful',
+      feedbackThanks: 'Thanks for your feedback!',
+    },
+    
+    // Quick Suggestions
+    suggestions: {
+      summarize: 'Summarize this document',
+      findInfo: 'Find information about...',
+      explain: 'Explain the concept of...',
+      compare: 'Compare the differences between...',
     },
     
     // Sources
@@ -532,6 +561,7 @@ const translations: Record<Language, Translations> = {
       seconds: 'seconds',
       payloadTooLarge: 'File is too large',
       validationError: 'Invalid data',
+      copyFailed: 'Could not copy to clipboard',
     },
     
     // Accessibility
