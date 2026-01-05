@@ -1,6 +1,8 @@
-import React from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useUIStore, useChatStore } from '@/store/appStore';
+import { useAuthStore } from '@/store/authStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useTheme } from '@/hooks/useTheme';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -8,8 +10,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 import { ReasoningPanel } from './ReasoningPanel';
 import { ProjectList } from '@/components/projects';
+import { WorkspaceSwitcher } from '@/components/workspace';
+import { PermissionGate } from '@/components/auth';
 import {
   MessageSquare,
   FolderOpen,
@@ -25,39 +30,69 @@ import {
   PanelRightClose,
   X,
   FolderKanban,
+  Users,
+  Building2,
+  Cpu,
+  LogOut,
+  Shield,
 } from 'lucide-react';
-
-const mainNavItems = [
-  { key: 'chat', path: '/', icon: MessageSquare, labelKey: 'nav.chat' },
-  { key: 'library', path: '/library', icon: FolderOpen, labelKey: 'nav.library' },
-  { key: 'conversations', path: '/conversations', icon: History, labelKey: 'nav.conversations' },
-];
-
-const adminNavItems = [
-  { key: 'admin', path: '/admin', icon: Settings, labelKey: 'nav.admin' },
-  { key: 'adminPrompt', path: '/admin/prompt', icon: FileText, labelKey: 'nav.adminPrompt' },
-  { key: 'adminRag', path: '/admin/rag', icon: Sliders, labelKey: 'nav.adminRag' },
-  { key: 'adminMemory', path: '/admin/memory', icon: Brain, labelKey: 'nav.adminMemory' },
-];
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { t, language, toggleLanguage } = useTranslation();
   const { toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
+  const { workspaceId } = useParams<{ workspaceId?: string }>();
   const { clearChat, setCurrentConversation } = useChatStore();
+  const { user, isAuthenticated, logout, isAdmin, isUserPlus } = useAuthStore();
+  const { currentWorkspaceId } = useWorkspaceStore();
+
+  const effectiveWorkspaceId = workspaceId || currentWorkspaceId || 'default';
 
   const handleNewChat = () => {
     clearChat();
     setCurrentConversation(null);
-    navigate('/');
+    navigate(`/w/${effectiveWorkspaceId}/chat`);
     onClose?.();
   };
 
   const handleConversationClick = (conversationId: string) => {
     setCurrentConversation(conversationId);
-    navigate('/');
+    navigate(`/w/${effectiveWorkspaceId}/chat`);
     onClose?.();
   };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+    onClose?.();
+  };
+
+  // Main navigation items - workspace scoped
+  const mainNavItems = [
+    { key: 'chat', path: `/w/${effectiveWorkspaceId}/chat`, icon: MessageSquare, labelKey: 'nav.chat' },
+    { key: 'conversations', path: `/w/${effectiveWorkspaceId}/conversations`, icon: History, labelKey: 'nav.conversations' },
+  ];
+
+  // Files - only for Admin and User+
+  const filesNavItem = { 
+    key: 'files', 
+    path: `/w/${effectiveWorkspaceId}/files`, 
+    icon: FolderOpen, 
+    labelKey: 'nav.files' 
+  };
+
+  // Workspace settings - Admin only
+  const workspaceSettingsItems = [
+    { key: 'models', path: `/w/${effectiveWorkspaceId}/settings/models`, icon: Cpu, labelKey: 'nav.settingsModels' },
+    { key: 'prompt', path: `/w/${effectiveWorkspaceId}/settings/prompt`, icon: FileText, labelKey: 'nav.settingsPrompt' },
+    { key: 'rag', path: `/w/${effectiveWorkspaceId}/settings/rag`, icon: Sliders, labelKey: 'nav.settingsRag' },
+  ];
+
+  // Admin global items
+  const adminNavItems = [
+    { key: 'workspaces', path: '/admin/workspaces', icon: Building2, labelKey: 'nav.adminWorkspaces' },
+    { key: 'users', path: '/admin/users', icon: Users, labelKey: 'nav.adminUsers' },
+  ];
 
   return (
     <div className="flex flex-col h-full bg-[#1a1d21] text-gray-300">
@@ -74,6 +109,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <X className="h-5 w-5" />
           </Button>
         )}
+      </div>
+
+      {/* Workspace Switcher */}
+      <div className="px-3 pb-3">
+        <WorkspaceSwitcher />
       </div>
 
       {/* New Chat */}
@@ -106,6 +146,23 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               {t(item.labelKey)}
             </NavLink>
           ))}
+
+          {/* Files - Admin + User+ only */}
+          <PermissionGate requireUserPlus>
+            <NavLink
+              to={filesNavItem.path}
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                isActive 
+                  ? "bg-white/10 text-white" 
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+              )}
+              onClick={onClose}
+            >
+              <filesNavItem.icon className="h-4 w-4" />
+              {t(filesNavItem.labelKey)}
+            </NavLink>
+          </PermissionGate>
         </nav>
 
         {/* Projects Section */}
@@ -118,47 +175,112 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         </div>
         <ProjectList onConversationClick={handleConversationClick} />
 
-        <div className="my-6 border-t border-white/10" />
+        {/* Workspace Settings - Admin only */}
+        <PermissionGate requireAdmin>
+          <div className="my-6 border-t border-white/10" />
+          <div className="flex items-center gap-2 px-3 mb-2">
+            <Settings className="h-4 w-4 text-gray-500" />
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Setări Workspace
+            </p>
+          </div>
+          <nav className="space-y-1">
+            {workspaceSettingsItems.map((item) => (
+              <NavLink
+                key={item.key}
+                to={item.path}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                  isActive 
+                    ? "bg-white/10 text-white" 
+                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                )}
+                onClick={onClose}
+              >
+                <item.icon className="h-4 w-4" />
+                {t(item.labelKey)}
+              </NavLink>
+            ))}
+          </nav>
+        </PermissionGate>
 
-        <p className="px-3 mb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</p>
-        <nav className="space-y-1">
-          {adminNavItems.map((item) => (
-            <NavLink
-              key={item.key}
-              to={item.path}
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                isActive 
-                  ? "bg-white/10 text-white" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-              )}
-              onClick={onClose}
-            >
-              <item.icon className="h-4 w-4" />
-              {t(item.labelKey)}
-            </NavLink>
-          ))}
-        </nav>
+        {/* Admin Panel - Admin only */}
+        <PermissionGate requireAdmin>
+          <div className="my-6 border-t border-white/10" />
+          <div className="flex items-center gap-2 px-3 mb-2">
+            <Shield className="h-4 w-4 text-gray-500" />
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Admin
+            </p>
+          </div>
+          <nav className="space-y-1">
+            {adminNavItems.map((item) => (
+              <NavLink
+                key={item.key}
+                to={item.path}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                  isActive 
+                    ? "bg-white/10 text-white" 
+                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                )}
+                onClick={onClose}
+              >
+                <item.icon className="h-4 w-4" />
+                {t(item.labelKey)}
+              </NavLink>
+            ))}
+          </nav>
+        </PermissionGate>
       </ScrollArea>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-white/10 flex items-center gap-2">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={toggleTheme}
-          className="text-gray-400 hover:bg-white/10 hover:text-white"
-        >
-          {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={toggleLanguage}
-          className="px-3 text-gray-400 hover:bg-white/10 hover:text-white"
-        >
-          <span className="text-xs font-semibold">{language === 'ro' ? 'RO' : 'EN'}</span>
-        </Button>
+      {/* Footer - User info & controls */}
+      <div className="p-3 border-t border-white/10 space-y-2">
+        {isAuthenticated && user && (
+          <div className="flex items-center gap-2 px-2 py-1">
+            <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center">
+              <span className="text-xs font-medium text-primary">
+                {user.username.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{user.username}</p>
+              <Badge variant="secondary" className="text-[10px] h-4">
+                {user.role === 'admin' ? 'Admin' : user.role === 'user_plus' ? 'User+' : 'User'}
+              </Badge>
+            </div>
+          </div>
+        )}
+        
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleTheme}
+            className="text-gray-400 hover:bg-white/10 hover:text-white"
+          >
+            {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={toggleLanguage}
+            className="px-3 text-gray-400 hover:bg-white/10 hover:text-white"
+          >
+            <span className="text-xs font-semibold">{language === 'ro' ? 'RO' : 'EN'}</span>
+          </Button>
+          
+          {isAuthenticated && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleLogout}
+              className="ml-auto text-gray-400 hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -169,7 +291,7 @@ export function MainLayout() {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const location = useLocation();
-  const showSourcesPanel = location.pathname === '/' && sourcesPanelOpen && !isMobile;
+  const showSourcesPanel = location.pathname.includes('/chat') && sourcesPanelOpen && !isMobile;
 
   return (
     <div className="flex min-h-screen w-full bg-background">
