@@ -79,26 +79,25 @@ export default function WorkspaceUsersPage() {
   };
 
   const handleCreateUser = async () => {
-    if (!newUsername.trim() || !newPassword.trim() || !workspaceId) return;
+    if (!newUsername.trim() || !newPassword.trim()) return;
 
     setIsCreating(true);
     try {
       // User+ can only create 'user' role, Admin can create 'user' or 'user_plus'
       const roleToCreate = isCurrentUserAdmin ? newRole : 'user';
       
+      // Create user WITHOUT assigning to any workspace
       const user = await createUser(newUsername.trim(), roleToCreate, newEmail.trim() || undefined, newPassword);
       
-      // Assign to current workspace
-      await assignUserToWorkspace(user.id, workspaceId);
+      // NOTE: User is NOT assigned to any workspace automatically
+      // An admin must explicitly add them to a workspace later
 
-      setUsers((prev) => [...prev, user]);
-      setWorkspaceUserIds((prev) => [...prev, user.id]);
       setShowCreateDialog(false);
       resetForm();
 
       toast({
         title: 'Utilizator creat',
-        description: `${user.username} a fost creat și adăugat la workspace.`,
+        description: `${user.username} a fost creat. Trebuie atribuit manual la un workspace.`,
       });
     } catch (error) {
       toast({
