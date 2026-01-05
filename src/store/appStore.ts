@@ -129,6 +129,7 @@ interface ChatState {
   setSelectedDocIds: (ids: string[]) => void;
   
   clearChat: () => void;
+  clearUserData: () => void;
 }
 
 export const useChatStore = create<ChatState>()((set, get) => ({
@@ -204,6 +205,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     reasoningSteps: [],
     isReasoning: false,
   }),
+  
+  clearUserData: () => set({
+    currentConversationId: null,
+    messages: [],
+    currentCitations: [],
+    selectedCitationId: null,
+    streamingText: '',
+    isStreaming: false,
+    streamingStatus: 'idle',
+    reasoningSteps: [],
+    isReasoning: false,
+    selectedDocIds: [],
+  }),
 }));
 
 // ============================================
@@ -256,6 +270,7 @@ interface ConversationsState {
   removeConversation: (id: string) => void;
   moveToProject: (conversationId: string, projectId: string | null) => void;
   getConversationsForUser: (userId: string) => Conversation[];
+  clearUserData: () => void;
 }
 
 export const useConversationsStore = create<ConversationsState>()(
@@ -278,6 +293,7 @@ export const useConversationsStore = create<ConversationsState>()(
         )
       })),
       getConversationsForUser: (userId) => get().conversations.filter((c) => c.userId === userId),
+      clearUserData: () => set({ conversations: [] }),
     }),
     {
       name: 'kotaemon-conversations',
@@ -298,6 +314,7 @@ interface ProjectsState {
   removeProject: (id: string) => void;
   setCurrentProject: (id: string | null) => void;
   getProjectsForUser: (userId: string) => Project[];
+  clearUserData: () => void;
 }
 
 export const useProjectsStore = create<ProjectsState>()(
@@ -318,6 +335,7 @@ export const useProjectsStore = create<ProjectsState>()(
       })),
       setCurrentProject: (currentProjectId) => set({ currentProjectId }),
       getProjectsForUser: (userId) => get().projects.filter((p) => p.userId === userId),
+      clearUserData: () => set({ projects: [], currentProjectId: null }),
     }),
     {
       name: 'kotaemon-projects',

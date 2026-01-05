@@ -9,14 +9,18 @@ import { Sparkles, Loader2 } from 'lucide-react';
 import { getUserByUsername, setCurrentUser, getUserWorkspaces } from '@/db/repo';
 import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useChatStore, useConversationsStore, useProjectsStore } from '@/store/appStore';
 import { toast } from '@/hooks/use-toast';
 import type { AuthUser } from '@/types/auth';
 
 export default function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { setUser } = useAuthStore();
+  const { setUser, user: currentUser } = useAuthStore();
   const { setCurrentWorkspace } = useWorkspaceStore();
+  const { clearUserData: clearChatData } = useChatStore();
+  const { clearUserData: clearConversationsData } = useConversationsStore();
+  const { clearUserData: clearProjectsData } = useProjectsStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -75,6 +79,13 @@ export default function LoginPage() {
         role: user.role,
         workspaceIds,
       };
+
+      // Clear previous user's data if logging in as different user
+      if (currentUser && currentUser.id !== user.id) {
+        clearChatData();
+        clearConversationsData();
+        clearProjectsData();
+      }
 
       setUser(authUser);
 
