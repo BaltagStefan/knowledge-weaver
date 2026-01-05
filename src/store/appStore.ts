@@ -91,6 +91,10 @@ interface ChatState {
   streamingText: string;
   abortController: AbortController | null;
   
+  // Live reasoning
+  reasoningSteps: string[];
+  isReasoning: boolean;
+  
   // Citations
   currentCitations: Citation[];
   selectedCitationId: string | null;
@@ -113,6 +117,10 @@ interface ChatState {
   appendStreamingText: (text: string) => void;
   stopStreaming: () => void;
   
+  addReasoningStep: (step: string) => void;
+  clearReasoning: () => void;
+  setIsReasoning: (isReasoning: boolean) => void;
+  
   setCitations: (citations: Citation[]) => void;
   selectCitation: (id: string | null) => void;
   
@@ -131,6 +139,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   streamingStatus: 'idle',
   streamingText: '',
   abortController: null,
+  
+  reasoningSteps: [],
+  isReasoning: false,
   
   currentCitations: [],
   selectedCitationId: null,
@@ -157,7 +168,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     return { messages };
   }),
   
-  startStreaming: (abortController) => set({ isStreaming: true, streamingText: '', abortController }),
+  startStreaming: (abortController) => set({ isStreaming: true, streamingText: '', abortController, reasoningSteps: [], isReasoning: true }),
   setStreamingStatus: (streamingStatus) => set({ streamingStatus }),
   appendStreamingText: (text) => set((state) => ({ streamingText: state.streamingText + text })),
   stopStreaming: () => {
@@ -165,8 +176,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (abortController) {
       abortController.abort();
     }
-    set({ isStreaming: false, streamingStatus: 'idle', streamingText: '', abortController: null });
+    set({ isStreaming: false, streamingStatus: 'idle', streamingText: '', abortController: null, isReasoning: false });
   },
+  
+  addReasoningStep: (step) => set((state) => ({ reasoningSteps: [...state.reasoningSteps, step] })),
+  clearReasoning: () => set({ reasoningSteps: [], isReasoning: false }),
+  setIsReasoning: (isReasoning) => set({ isReasoning }),
   
   setCitations: (currentCitations) => set({ currentCitations }),
   selectCitation: (selectedCitationId) => set({ selectedCitationId }),
@@ -186,6 +201,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     streamingText: '',
     isStreaming: false,
     streamingStatus: 'idle',
+    reasoningSteps: [],
+    isReasoning: false,
   }),
 }));
 

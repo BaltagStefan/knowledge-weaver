@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { ReasoningPanel } from './ReasoningPanel';
 import {
   MessageSquare,
   FolderOpen,
@@ -178,18 +179,16 @@ export function MainLayout() {
             <Outlet />
           </main>
 
-          {/* Sources panel */}
+          {/* Live Reasoning panel */}
           {showSourcesPanel && (
             <aside className="fixed right-0 top-0 bottom-0 w-80 border-l bg-white dark:bg-card hidden lg:block">
               <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="font-semibold">{t('sources.title')}</h2>
+                <h2 className="font-semibold">{t('reasoning.title')}</h2>
                 <Button variant="ghost" size="icon" onClick={toggleSourcesPanel}>
                   <PanelRightClose className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="p-4">
-                <p className="text-sm text-muted-foreground">{t('sources.noSources')}</p>
-              </div>
+              <ReasoningPanel />
             </aside>
           )}
         </div>
