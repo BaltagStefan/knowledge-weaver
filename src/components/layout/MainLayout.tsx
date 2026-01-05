@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useUIStore, useChatStore } from '@/store/appStore';
+import { useUIStore, useChatStore, useConversationsStore, useProjectsStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -42,7 +42,9 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
   const { workspaceId } = useParams<{ workspaceId?: string }>();
-  const { clearChat, setCurrentConversation } = useChatStore();
+  const { clearChat, setCurrentConversation, clearUserData: clearChatData } = useChatStore();
+  const { clearUserData: clearConversationsData } = useConversationsStore();
+  const { clearUserData: clearProjectsData } = useProjectsStore();
   const { user, isAuthenticated, logout, isAdmin, isUserPlus } = useAuthStore();
   const { currentWorkspaceId } = useWorkspaceStore();
 
@@ -62,6 +64,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   };
 
   const handleLogout = () => {
+    // Clear all user-specific data
+    clearChatData();
+    clearConversationsData();
+    clearProjectsData();
     logout();
     navigate('/login');
     onClose?.();
