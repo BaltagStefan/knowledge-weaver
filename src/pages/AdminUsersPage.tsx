@@ -281,7 +281,7 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle>Adaugă Utilizator Nou</DialogTitle>
             <DialogDescription>
-              Creează un cont nou pentru un utilizator.
+              Creează un cont nou. Utilizatorul nu va putea folosi aplicația până când nu este atribuit la cel puțin un workspace.
             </DialogDescription>
           </DialogHeader>
 
@@ -335,8 +335,11 @@ export default function AdminUsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Workspace-uri</Label>
-              <div className="space-y-2 max-h-32 overflow-auto">
+              <Label>Workspace-uri (opțional)</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Dacă nu selectați niciun workspace, utilizatorul va vedea un mesaj că nu a fost atribuit și nu va putea folosi chat-ul.
+              </p>
+              <div className="space-y-2 max-h-32 overflow-auto border rounded-md p-2">
                 {workspaces.map((ws) => (
                   <div key={ws.id} className="flex items-center gap-2">
                     <Checkbox

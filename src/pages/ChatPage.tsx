@@ -2,12 +2,14 @@ import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useChatStore, useUIStore, useConversationsStore, useProjectsStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 import { streamChat } from '@/api';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { StreamingStatus } from '@/components/chat/StreamingStatus';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ScrollToBottom } from '@/components/chat/ScrollToBottom';
+import { NoWorkspaceMessage } from '@/components/workspace/NoWorkspaceMessage';
 import { ExportButton } from '@/components/export';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -43,8 +45,12 @@ export default function ChatPage() {
   const { currentProjectId, projects, getProjectsForUser } = useProjectsStore();
   const { addConversation, getConversationsForUser } = useConversationsStore();
   const { user } = useAuthStore();
+  const { workspaces, currentWorkspaceId } = useWorkspaceStore();
 
   const userProjects = user ? getProjectsForUser(user.id) : [];
+  
+  // Check if user has any workspaces assigned
+  const hasWorkspace = user?.workspaceIds && user.workspaceIds.length > 0;
   const currentProject = userProjects.find(p => p.id === currentProjectId);
 
   const scrollToBottom = useCallback(() => {
@@ -174,6 +180,21 @@ export default function ChatPage() {
   }, [messages, handleSend]);
 
   const showEmptyState = messages.length === 0 && !isStreaming;
+
+  // If user has no workspace, show the no-workspace message
+  if (!hasWorkspace) {
+    return (
+      <div className="flex flex-col h-full bg-white dark:bg-background">
+        <header className="flex items-center justify-between h-14 px-6 border-b bg-white dark:bg-background shrink-0">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h1 className="font-medium text-foreground">Chat</h1>
+          </div>
+        </header>
+        <NoWorkspaceMessage />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-background">
