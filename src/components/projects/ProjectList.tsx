@@ -52,7 +52,7 @@ interface ProjectListProps {
 
 export function ProjectList({ onConversationClick }: ProjectListProps) {
   const { t } = useTranslation();
-  const { projects, addProject, updateProject, removeProject } = useProjectsStore();
+  const { projects, currentProjectId, setCurrentProject, addProject, updateProject, removeProject } = useProjectsStore();
   const { conversations } = useConversationsStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -181,12 +181,21 @@ export function ProjectList({ onConversationClick }: ProjectListProps) {
             open={isExpanded}
             onOpenChange={() => toggleProject(project.id)}
           >
-            <div className="group flex items-center gap-1 px-2">
+            <div className={cn(
+              "group flex items-center gap-1 px-2 rounded-md transition-colors",
+              currentProjectId === project.id && "bg-primary/20 ring-1 ring-primary/30"
+            )}>
               <CollapsibleTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex-1 justify-start gap-2 text-gray-300 hover:text-white hover:bg-white/5 h-9"
+                  className={cn(
+                    "flex-1 justify-start gap-2 h-9",
+                    currentProjectId === project.id 
+                      ? "text-primary-foreground hover:text-primary-foreground hover:bg-transparent" 
+                      : "text-gray-300 hover:text-white hover:bg-white/5"
+                  )}
+                  onClick={() => setCurrentProject(project.id)}
                 >
                   <ChevronRight
                     className={cn(
