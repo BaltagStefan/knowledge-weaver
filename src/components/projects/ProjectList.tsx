@@ -195,7 +195,7 @@ export function ProjectList({ onConversationClick }: ProjectListProps) {
                       ? "text-primary-foreground hover:text-primary-foreground hover:bg-transparent" 
                       : "text-gray-300 hover:text-white hover:bg-white/5"
                   )}
-                  onClick={() => setCurrentProject(project.id)}
+                  onClick={() => setCurrentProject(currentProjectId === project.id ? null : project.id)}
                 >
                   <ChevronRight
                     className={cn(
