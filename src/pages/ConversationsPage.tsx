@@ -28,7 +28,7 @@ export default function ConversationsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user } = useAuthStore();
   const { getConversationsForUser, removeConversation, updateConversation, conversations } = useConversationsStore();
-  const { setCurrentConversation } = useChatStore();
+  const { setCurrentConversation, deleteConversationMessages } = useChatStore();
   const { getProjectsForUser, updateProject } = useProjectsStore();
 
   const [draggedConversation, setDraggedConversation] = useState<string | null>(null);
@@ -62,6 +62,9 @@ export default function ConversationsPage() {
   };
 
   const handleDeleteConversation = (conversationId: string) => {
+    // Delete messages for this conversation
+    deleteConversationMessages(conversationId);
+    // Remove conversation from store
     removeConversation(conversationId);
     toast({
       title: t('common.success'),
