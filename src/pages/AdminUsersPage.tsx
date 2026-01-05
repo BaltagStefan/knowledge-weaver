@@ -44,6 +44,7 @@ export default function AdminUsersPage() {
   
   // Create form state
   const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'user' | 'user_plus'>('user');
   const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>([]);
@@ -70,11 +71,11 @@ export default function AdminUsersPage() {
   };
 
   const handleCreateUser = async () => {
-    if (!newUsername.trim()) return;
+    if (!newUsername.trim() || !newPassword.trim()) return;
 
     setIsCreating(true);
     try {
-      const user = await createUser(newUsername.trim(), newRole, newEmail.trim() || undefined);
+      const user = await createUser(newUsername.trim(), newRole, newEmail.trim() || undefined, newPassword);
       
       // Assign to selected workspaces
       for (const workspaceId of selectedWorkspaces) {
@@ -121,6 +122,7 @@ export default function AdminUsersPage() {
 
   const resetForm = () => {
     setNewUsername('');
+    setNewPassword('');
     setNewEmail('');
     setNewRole('user');
     setSelectedWorkspaces([]);
@@ -295,6 +297,17 @@ export default function AdminUsersPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="password">Parolă *</Label>
+              <Input
+                id="password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Parola utilizatorului"
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="email">Email (opțional)</Label>
               <Input
                 id="email"
@@ -350,7 +363,7 @@ export default function AdminUsersPage() {
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
               Anulează
             </Button>
-            <Button onClick={handleCreateUser} disabled={isCreating || !newUsername.trim()}>
+            <Button onClick={handleCreateUser} disabled={isCreating || !newUsername.trim() || !newPassword.trim()}>
               {isCreating ? 'Se creează...' : 'Creează'}
             </Button>
           </DialogFooter>
