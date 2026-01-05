@@ -298,7 +298,11 @@ function TopNavBar() {
   const { workspaceId } = useParams<{ workspaceId?: string }>();
   const location = useLocation();
   const { currentWorkspaceId } = useWorkspaceStore();
-  const { isAdmin, isUserPlus } = useAuthStore();
+  const { isAdmin, isUserPlus, isAuthenticated, user } = useAuthStore();
+  
+  // Get actual role checks (these are functions)
+  const userIsAdmin = isAdmin();
+  const userIsUserPlus = isUserPlus();
   
   const effectiveWorkspaceId = workspaceId || currentWorkspaceId || 'default';
   const breadcrumbs = getBreadcrumbs(location.pathname, effectiveWorkspaceId, t);
@@ -321,8 +325,11 @@ function TopNavBar() {
     { key: 'users', path: '/admin/users', icon: Users, label: t('nav.adminUsers') },
   ];
 
-  // Don't render if user has no elevated permissions
-  if (!isUserPlus && !isAdmin) return null;
+  // Don't render if user is not authenticated or is a regular 'user' role
+  if (!isAuthenticated || !user || user.role === 'user') return null;
+  
+  // Only show for user_plus and admin
+  if (!userIsUserPlus && !userIsAdmin) return null;
 
   return (
     <header className="border-b bg-gradient-to-r from-slate-50 to-gray-50 dark:from-card dark:to-card/80">
@@ -354,7 +361,7 @@ function TopNavBar() {
       {/* Navigation Tabs Row */}
       <div className="h-11 px-5 flex items-center gap-6">
         {/* Workspace Settings - User+ and Admin */}
-        {(isUserPlus || isAdmin) && (
+        {(userIsUserPlus || userIsAdmin) && (
           <div className="flex items-center">
             <div className="flex items-center gap-0.5 bg-white dark:bg-white/5 rounded-lg p-1 shadow-sm border border-border/40">
               {workspaceSettingsItems.map((item) => (
@@ -372,7 +379,7 @@ function TopNavBar() {
                   <span className="hidden md:inline">{item.label}</span>
                 </NavLink>
               ))}
-              {isAdmin && adminWorkspaceSettings.map((item) => (
+              {userIsAdmin && adminWorkspaceSettings.map((item) => (
                 <NavLink
                   key={item.key}
                   to={item.path}
@@ -392,7 +399,7 @@ function TopNavBar() {
         )}
 
         {/* Admin Panel - Admin only */}
-        {isAdmin && (
+        {userIsAdmin && (
           <>
             <div className="h-5 w-px bg-border/60" />
             <div className="flex items-center">
@@ -430,9 +437,13 @@ export function MainLayout() {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const location = useLocation();
-  const { isUserPlus, isAdmin } = useAuthStore();
+  const { isUserPlus, isAdmin, isAuthenticated, user } = useAuthStore();
   const showSourcesPanel = location.pathname.includes('/chat') && sourcesPanelOpen && !isMobile;
-  const showTopNav = (isUserPlus || isAdmin) && !isMobile;
+  
+  // Only show top nav for authenticated user_plus or admin users
+  const userIsAdmin = isAdmin();
+  const userIsUserPlus = isUserPlus();
+  const showTopNav = isAuthenticated && user && user.role !== 'user' && (userIsUserPlus || userIsAdmin) && !isMobile;
 
   return (
     <div className="flex min-h-screen w-full bg-background">
