@@ -196,96 +196,6 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         </div>
         <ProjectList onConversationClick={handleConversationClick} />
 
-        {/* Workspace Settings Section - User+ and Admin */}
-        <PermissionGate requireUserPlus>
-          <div className="my-6 border-t border-white/10" />
-          <div className="flex items-center gap-2 px-3 mb-2">
-            <Settings className="h-4 w-4 text-gray-500" />
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Setări Workspace
-            </p>
-          </div>
-          <nav className="space-y-1">
-            {/* Prompt - User+ and Admin */}
-            <NavLink
-              to={promptSettingItem.path}
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                isActive 
-                  ? "bg-white/10 text-white" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-              )}
-              onClick={onClose}
-            >
-              <promptSettingItem.icon className="h-4 w-4" />
-              {t(promptSettingItem.labelKey)}
-            </NavLink>
-
-            {/* Workspace Users - User+ and Admin */}
-            <NavLink
-              to={workspaceUsersItem.path}
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                isActive 
-                  ? "bg-white/10 text-white" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-              )}
-              onClick={onClose}
-            >
-              <workspaceUsersItem.icon className="h-4 w-4" />
-              Utilizatori
-            </NavLink>
-
-            {/* Models and RAG - Admin only */}
-            <PermissionGate requireAdmin>
-              {workspaceSettingsItemsAdmin.map((item) => (
-                <NavLink
-                  key={item.key}
-                  to={item.path}
-                  className={({ isActive }) => cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                    isActive 
-                      ? "bg-white/10 text-white" 
-                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                  )}
-                  onClick={onClose}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {t(item.labelKey)}
-                </NavLink>
-              ))}
-            </PermissionGate>
-          </nav>
-        </PermissionGate>
-
-        {/* Admin Panel - Admin only */}
-        <PermissionGate requireAdmin>
-          <div className="my-6 border-t border-white/10" />
-          <div className="flex items-center gap-2 px-3 mb-2">
-            <Shield className="h-4 w-4 text-gray-500" />
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Admin
-            </p>
-          </div>
-          <nav className="space-y-1">
-            {adminNavItems.map((item) => (
-              <NavLink
-                key={item.key}
-                to={item.path}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                  isActive 
-                    ? "bg-white/10 text-white" 
-                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                )}
-                onClick={onClose}
-              >
-                <item.icon className="h-4 w-4" />
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
-          </nav>
-        </PermissionGate>
       </ScrollArea>
 
       {/* Footer - User info & controls */}
@@ -340,12 +250,118 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   );
 }
 
+function TopNavBar() {
+  const { t } = useTranslation();
+  const { workspaceId } = useParams<{ workspaceId?: string }>();
+  const { currentWorkspaceId } = useWorkspaceStore();
+  const { isAdmin, isUserPlus } = useAuthStore();
+  
+  const effectiveWorkspaceId = workspaceId || currentWorkspaceId || 'default';
+
+  // Workspace settings items for User+ and Admin
+  const workspaceSettingsItems = [
+    { key: 'prompt', path: `/w/${effectiveWorkspaceId}/settings/prompt`, icon: FileText, label: t('nav.settingsPrompt') },
+    { key: 'workspace-users', path: `/w/${effectiveWorkspaceId}/workspace-users`, icon: Users, label: 'Utilizatori' },
+  ];
+
+  // Admin-only workspace settings
+  const adminWorkspaceSettings = [
+    { key: 'models', path: `/w/${effectiveWorkspaceId}/settings/models`, icon: Cpu, label: t('nav.settingsModels') },
+    { key: 'rag', path: `/w/${effectiveWorkspaceId}/settings/rag`, icon: Sliders, label: t('nav.settingsRag') },
+  ];
+
+  // Admin global items
+  const adminNavItems = [
+    { key: 'workspaces', path: '/admin/workspaces', icon: Building2, label: t('nav.adminWorkspaces') },
+    { key: 'users', path: '/admin/users', icon: Users, label: t('nav.adminUsers') },
+  ];
+
+  // Don't render if user has no elevated permissions
+  if (!isUserPlus && !isAdmin) return null;
+
+  return (
+    <header className="h-12 border-b bg-white dark:bg-card flex items-center px-4 gap-1">
+      {/* Workspace Settings - User+ and Admin */}
+      {(isUserPlus || isAdmin) && (
+        <>
+          <div className="flex items-center gap-1 mr-2">
+            <Settings className="h-4 w-4 text-muted-foreground mr-1" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">
+              Setări
+            </span>
+            {workspaceSettingsItems.map((item) => (
+              <NavLink
+                key={item.key}
+                to={item.path}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
+                  isActive 
+                    ? "bg-primary/10 text-primary font-medium" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{item.label}</span>
+              </NavLink>
+            ))}
+            {isAdmin && adminWorkspaceSettings.map((item) => (
+              <NavLink
+                key={item.key}
+                to={item.path}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
+                  isActive 
+                    ? "bg-primary/10 text-primary font-medium" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Separator */}
+      {isAdmin && <div className="w-px h-6 bg-border mx-2" />}
+
+      {/* Admin Panel - Admin only */}
+      {isAdmin && (
+        <div className="flex items-center gap-1">
+          <Shield className="h-4 w-4 text-muted-foreground mr-1" />
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">
+            Admin
+          </span>
+          {adminNavItems.map((item) => (
+            <NavLink
+              key={item.key}
+              to={item.path}
+              className={({ isActive }) => cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
+                isActive 
+                  ? "bg-primary/10 text-primary font-medium" 
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              <span className="hidden sm:inline">{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </header>
+  );
+}
+
 export function MainLayout() {
   const { sidebarOpen, setSidebarOpen, sourcesPanelOpen, toggleSourcesPanel } = useUIStore();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const location = useLocation();
+  const { isUserPlus, isAdmin } = useAuthStore();
   const showSourcesPanel = location.pathname.includes('/chat') && sourcesPanelOpen && !isMobile;
+  const showTopNav = (isUserPlus || isAdmin) && !isMobile;
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -376,6 +392,9 @@ export function MainLayout() {
             <span className="font-semibold">Kotaemon</span>
           </header>
         )}
+
+        {/* Top Navigation Bar for Settings/Admin */}
+        {showTopNav && <TopNavBar />}
 
         <div className="flex flex-1 min-h-0">
           <main className={cn("flex-1 min-w-0 flex flex-col bg-[#f7f7f8] dark:bg-background", showSourcesPanel && "lg:mr-80")}>
