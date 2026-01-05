@@ -107,6 +107,19 @@ const translations: Record<Language, Translations> = {
       viewContext: 'Vezi contextul',
     },
     
+    // Reasoning
+    reasoning: {
+      title: 'Live Reasoning',
+      thinking: 'Gândesc...',
+      analyzing: 'Analizez întrebarea...',
+      searching: 'Caut informații relevante...',
+      processing: 'Procesez rezultatele...',
+      generating: 'Formulez răspunsul...',
+      complete: 'Complet',
+      noActivity: 'Nicio activitate',
+      noActivityDescription: 'Procesul de gândire va apărea aici când trimiți un mesaj.',
+    },
+    
     // Library
     library: {
       title: 'Bibliotecă PDF',
@@ -360,6 +373,19 @@ const translations: Record<Language, Translations> = {
       score: 'Score',
       openPdf: 'Open PDF',
       viewContext: 'View context',
+    },
+    
+    // Reasoning
+    reasoning: {
+      title: 'Live Reasoning',
+      thinking: 'Thinking...',
+      analyzing: 'Analyzing question...',
+      searching: 'Searching for relevant information...',
+      processing: 'Processing results...',
+      generating: 'Formulating response...',
+      complete: 'Complete',
+      noActivity: 'No activity',
+      noActivityDescription: 'The thinking process will appear here when you send a message.',
     },
     
     // Library
