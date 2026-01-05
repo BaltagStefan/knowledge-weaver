@@ -39,8 +39,10 @@ export default function ChatPage() {
     setCurrentConversation,
   } = useChatStore();
 
-  const { currentProjectId } = useProjectsStore();
+  const { currentProjectId, projects } = useProjectsStore();
   const { addConversation } = useConversationsStore();
+
+  const currentProject = projects.find(p => p.id === currentProjectId);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -176,6 +178,17 @@ export default function ChatPage() {
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           <h1 className="font-medium text-foreground">{t('nav.chat')}</h1>
+          {currentProject && (
+            <div className="flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-full bg-muted/50 border">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ backgroundColor: currentProject.color }}
+              />
+              <span className="text-xs font-medium text-muted-foreground">
+                {currentProject.name}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {messages.length > 0 && <ExportButton />}
