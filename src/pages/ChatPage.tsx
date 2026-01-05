@@ -1,12 +1,13 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useChatStore, useUIStore } from '@/store/appStore';
+import { useChatStore, useUIStore, useConversationsStore } from '@/store/appStore';
 import { streamChat } from '@/api';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { StreamingStatus } from '@/components/chat/StreamingStatus';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ScrollToBottom } from '@/components/chat/ScrollToBottom';
+import { ExportButton } from '@/components/export';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
@@ -156,18 +157,21 @@ export default function ChatPage() {
           <Sparkles className="h-5 w-5 text-primary" />
           <h1 className="font-medium text-foreground">{t('nav.chat')}</h1>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSourcesPanel}
-          className="hidden lg:flex hover:bg-muted transition-colors"
-        >
-          {sourcesPanelOpen ? (
-            <PanelRightClose className="h-4 w-4" />
-          ) : (
-            <PanelRightOpen className="h-4 w-4" />
-          )}
-        </Button>
+        <div className="flex items-center gap-1">
+          {messages.length > 0 && <ExportButton />}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSourcesPanel}
+            className="hidden lg:flex hover:bg-muted transition-colors"
+          >
+            {sourcesPanelOpen ? (
+              <PanelRightClose className="h-4 w-4" />
+            ) : (
+              <PanelRightOpen className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </header>
 
       {/* Messages area */}

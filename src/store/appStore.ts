@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Language } from '@/lib/i18n';
-import type { AuthUser, ChatSource, RagSettings, Doc, Citation, Conversation, Message } from '@/types';
+import type { AuthUser, ChatSource, RagSettings, Doc, Citation, Conversation, Message, Project } from '@/types';
 
 // ============================================
 // Auth Store
@@ -254,6 +254,7 @@ interface ConversationsState {
   addConversation: (conversation: Conversation) => void;
   updateConversation: (id: string, updates: Partial<Conversation>) => void;
   removeConversation: (id: string) => void;
+  moveToProject: (conversationId: string, projectId: string | null) => void;
 }
 
 export const useConversationsStore = create<ConversationsState>()((set) => ({
@@ -268,4 +269,47 @@ export const useConversationsStore = create<ConversationsState>()((set) => ({
   removeConversation: (id) => set((state) => ({
     conversations: state.conversations.filter((c) => c.id !== id)
   })),
+  moveToProject: (conversationId, projectId) => set((state) => ({
+    conversations: state.conversations.map((c) => 
+      c.id === conversationId ? { ...c, projectId: projectId || undefined } : c
+    )
+  })),
 }));
+
+// ============================================
+// Projects Store
+// ============================================
+
+interface ProjectsState {
+  projects: Project[];
+  currentProjectId: string | null;
+  setProjects: (projects: Project[]) => void;
+  addProject: (project: Project) => void;
+  updateProject: (id: string, updates: Partial<Project>) => void;
+  removeProject: (id: string) => void;
+  setCurrentProject: (id: string | null) => void;
+}
+
+export const useProjectsStore = create<ProjectsState>()(
+  persist(
+    (set) => ({
+      projects: [],
+      currentProjectId: null,
+      setProjects: (projects) => set({ projects }),
+      addProject: (project) => set((state) => ({ 
+        projects: [project, ...state.projects] 
+      })),
+      updateProject: (id, updates) => set((state) => ({
+        projects: state.projects.map((p) => p.id === id ? { ...p, ...updates } : p)
+      })),
+      removeProject: (id) => set((state) => ({
+        projects: state.projects.filter((p) => p.id !== id),
+        currentProjectId: state.currentProjectId === id ? null : state.currentProjectId
+      })),
+      setCurrentProject: (currentProjectId) => set({ currentProjectId }),
+    }),
+    {
+      name: 'kotaemon-projects',
+    }
+  )
+);

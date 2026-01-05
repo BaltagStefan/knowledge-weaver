@@ -58,6 +58,28 @@ export interface DocUploadResponse {
 }
 
 // ============================================
+// Project Types
+// ============================================
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  createdAt: string;
+  updatedAt: string;
+  conversationIds: string[];
+}
+
+export interface ProjectCreate {
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+}
+
+// ============================================
 // Conversation Types
 // ============================================
 
@@ -68,6 +90,7 @@ export interface Conversation {
   updatedAt: string;
   messageCount: number;
   preview?: string;
+  projectId?: string;
 }
 
 export interface Message {
