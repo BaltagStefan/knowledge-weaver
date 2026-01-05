@@ -45,6 +45,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'files:upload',
     'files:delete',
     'files:index',
+    'settings:prompt',
     'users:create_user',
   ],
   admin: [
@@ -70,9 +71,19 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
 }
 
 export function canAccessRoute(role: UserRole, route: string): boolean {
-  // Admin-only routes
+  // Prompt settings - Admin + User+
+  if (route.includes('/settings/prompt')) {
+    return role === 'admin' || role === 'user_plus';
+  }
+  
+  // Other workspace settings - Admin only
   if (route.includes('/settings/')) {
     return role === 'admin';
+  }
+  
+  // Workspace users page - Admin + User+
+  if (route.includes('/workspace-users')) {
+    return role === 'admin' || role === 'user_plus';
   }
   
   if (route.startsWith('/admin')) {

@@ -81,12 +81,27 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
     labelKey: 'nav.files' 
   };
 
-  // Workspace settings - Admin only
-  const workspaceSettingsItems = [
+  // Workspace settings - Admin only (except prompt which is also for User+)
+  const workspaceSettingsItemsAdmin = [
     { key: 'models', path: `/w/${effectiveWorkspaceId}/settings/models`, icon: Cpu, labelKey: 'nav.settingsModels' },
-    { key: 'prompt', path: `/w/${effectiveWorkspaceId}/settings/prompt`, icon: FileText, labelKey: 'nav.settingsPrompt' },
     { key: 'rag', path: `/w/${effectiveWorkspaceId}/settings/rag`, icon: Sliders, labelKey: 'nav.settingsRag' },
   ];
+
+  // Prompt setting - Admin + User+
+  const promptSettingItem = { 
+    key: 'prompt', 
+    path: `/w/${effectiveWorkspaceId}/settings/prompt`, 
+    icon: FileText, 
+    labelKey: 'nav.settingsPrompt' 
+  };
+
+  // Workspace users - Admin + User+ (User+ can only add regular users)
+  const workspaceUsersItem = { 
+    key: 'workspace-users', 
+    path: `/w/${effectiveWorkspaceId}/workspace-users`, 
+    icon: Users, 
+    labelKey: 'nav.workspaceUsers' 
+  };
 
   // Admin global items
   const adminNavItems = [
@@ -175,8 +190,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         </div>
         <ProjectList onConversationClick={handleConversationClick} />
 
-        {/* Workspace Settings - Admin only */}
-        <PermissionGate requireAdmin>
+        {/* Workspace Settings Section - User+ and Admin */}
+        <PermissionGate requireUserPlus>
           <div className="my-6 border-t border-white/10" />
           <div className="flex items-center gap-2 px-3 mb-2">
             <Settings className="h-4 w-4 text-gray-500" />
@@ -185,22 +200,55 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             </p>
           </div>
           <nav className="space-y-1">
-            {workspaceSettingsItems.map((item) => (
-              <NavLink
-                key={item.key}
-                to={item.path}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                  isActive 
-                    ? "bg-white/10 text-white" 
-                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                )}
-                onClick={onClose}
-              >
-                <item.icon className="h-4 w-4" />
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
+            {/* Prompt - User+ and Admin */}
+            <NavLink
+              to={promptSettingItem.path}
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                isActive 
+                  ? "bg-white/10 text-white" 
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+              )}
+              onClick={onClose}
+            >
+              <promptSettingItem.icon className="h-4 w-4" />
+              {t(promptSettingItem.labelKey)}
+            </NavLink>
+
+            {/* Workspace Users - User+ and Admin */}
+            <NavLink
+              to={workspaceUsersItem.path}
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                isActive 
+                  ? "bg-white/10 text-white" 
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+              )}
+              onClick={onClose}
+            >
+              <workspaceUsersItem.icon className="h-4 w-4" />
+              Utilizatori
+            </NavLink>
+
+            {/* Models and RAG - Admin only */}
+            <PermissionGate requireAdmin>
+              {workspaceSettingsItemsAdmin.map((item) => (
+                <NavLink
+                  key={item.key}
+                  to={item.path}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                    isActive 
+                      ? "bg-white/10 text-white" 
+                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  )}
+                  onClick={onClose}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {t(item.labelKey)}
+                </NavLink>
+              ))}
+            </PermissionGate>
           </nav>
         </PermissionGate>
 

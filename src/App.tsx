@@ -13,6 +13,7 @@ import FilesPage from "./pages/FilesPage";
 import WorkspaceModelsPage from "./pages/WorkspaceModelsPage";
 import WorkspacePromptPage from "./pages/WorkspacePromptPage";
 import WorkspaceRagPage from "./pages/WorkspaceRagPage";
+import WorkspaceUsersPage from "./pages/WorkspaceUsersPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminWorkspacesPage from "./pages/AdminWorkspacesPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -66,8 +67,13 @@ function AppContent() {
             </ProtectedRoute>
           } />
           <Route path="/w/:workspaceId/settings/prompt" element={
-            <ProtectedRoute requireAdmin>
+            <ProtectedRoute requireUserPlus>
               <WorkspacePromptPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/w/:workspaceId/workspace-users" element={
+            <ProtectedRoute requireUserPlus>
+              <WorkspaceUsersPage />
             </ProtectedRoute>
           } />
           <Route path="/w/:workspaceId/settings/rag" element={
