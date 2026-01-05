@@ -293,12 +293,18 @@ const translations: Record<Language, Translations> = {
     
     // Auth
     auth: {
-      loginTitle: 'Autentificare Admin',
+      loginTitle: 'Autentificare',
+      username: 'Utilizator',
+      usernamePlaceholder: 'Introdu numele de utilizator...',
       password: 'Parolă',
       passwordPlaceholder: 'Introdu parola...',
       login: 'Autentificare',
       logout: 'Deconectare',
       invalidCredentials: 'Credențiale invalide',
+      accountDisabled: 'Contul este dezactivat',
+      loginSuccess: 'Autentificare reușită',
+      loginError: 'Eroare la autentificare',
+      demoCredentials: 'Credențiale demo',
       sessionExpired: 'Sesiunea a expirat',
       unauthorized: 'Acces neautorizat',
     },
@@ -613,12 +619,18 @@ const translations: Record<Language, Translations> = {
     
     // Auth
     auth: {
-      loginTitle: 'Admin Login',
+      loginTitle: 'Login',
+      username: 'Username',
+      usernamePlaceholder: 'Enter username...',
       password: 'Password',
       passwordPlaceholder: 'Enter password...',
       login: 'Login',
       logout: 'Logout',
       invalidCredentials: 'Invalid credentials',
+      accountDisabled: 'Account is disabled',
+      loginSuccess: 'Login successful',
+      loginError: 'Login error',
+      demoCredentials: 'Demo credentials',
       sessionExpired: 'Session expired',
       unauthorized: 'Unauthorized access',
     },

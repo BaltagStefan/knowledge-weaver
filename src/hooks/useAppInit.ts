@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { initializeDatabase } from '@/db/dexie';
-import { createWorkspace, createUser, assignUserToWorkspace, getCurrentUser, setCurrentUser, listWorkspaces } from '@/db/repo';
+import { createWorkspace, createUser, assignUserToWorkspace, getCurrentUser, getUserWorkspaces, listWorkspaces, getUserByUsername } from '@/db/repo';
 import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import type { AuthUser } from '@/types/auth';
@@ -16,50 +16,50 @@ export function useAppInit() {
         // Initialize database
         await initializeDatabase();
 
-        // Check for existing user
-        let currentUser = await getCurrentUser();
-
-        // If no user, create demo data
-        if (!currentUser) {
+        // Check if demo users exist, if not create them
+        const existingAdmin = await getUserByUsername('admin');
+        
+        if (!existingAdmin) {
           // Create default workspace
-          const defaultWorkspace = await createWorkspace('Default', 'Workspace implicit');
+          const defaultWorkspace = await createWorkspace('Default', 'Default workspace');
 
-          // Create demo admin user
-          const adminUser = await createUser('admin', 'admin', 'admin@demo.local');
+          // Create demo admin user (password = username for demo)
+          const adminUser = await createUser('admin', 'admin', 'admin@demo.local', 'admin');
           await assignUserToWorkspace(adminUser.id, defaultWorkspace.id, 'manager');
 
           // Create demo user+ 
-          const userPlus = await createUser('manager', 'user_plus', 'manager@demo.local');
-          await assignUserToWorkspace(userPlus.id, defaultWorkspace.id, 'member');
+          const userPlus = await createUser('user+', 'user_plus', 'userplus@demo.local', 'user+');
+          await assignUserToWorkspace(userPlus.id, defaultWorkspace.id, 'manager');
 
           // Create demo user
-          const regularUser = await createUser('user', 'user', 'user@demo.local');
+          const regularUser = await createUser('user', 'user', 'user@demo.local', 'user');
           await assignUserToWorkspace(regularUser.id, defaultWorkspace.id, 'member');
-
-          // Set admin as current user for demo
-          await setCurrentUser(adminUser.id);
-          currentUser = adminUser;
         }
+
+        // Check for existing logged in user
+        const currentUser = await getCurrentUser();
 
         // Load workspaces
         const workspaces = await listWorkspaces();
         setWorkspaces(workspaces);
 
-        // Set current workspace if available
-        if (workspaces.length > 0) {
-          setCurrentWorkspace(workspaces[0].id);
-        }
-
-        // Set auth state
+        // If user is logged in, restore session
         if (currentUser) {
+          const workspaceIds = await getUserWorkspaces(currentUser.id);
+          
           const authUser: AuthUser = {
             id: currentUser.id,
             username: currentUser.username,
             email: currentUser.email,
             role: currentUser.role,
-            workspaceIds: workspaces.map((w) => w.id),
+            workspaceIds,
           };
           setUser(authUser);
+
+          // Set current workspace if available
+          if (workspaceIds.length > 0) {
+            setCurrentWorkspace(workspaceIds[0]);
+          }
         }
 
         setLoading(false);
