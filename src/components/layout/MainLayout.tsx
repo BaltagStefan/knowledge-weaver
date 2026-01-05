@@ -7,7 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   MessageSquare,
   FolderOpen,
@@ -20,9 +20,8 @@ import {
   Sun,
   Moon,
   Menu,
-  Sparkles,
-  PanelRightOpen,
   PanelRightClose,
+  X,
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -38,35 +37,33 @@ const adminNavItems = [
   { key: 'adminMemory', path: '/admin/memory', icon: Brain, labelKey: 'nav.adminMemory' },
 ];
 
-function SidebarContent() {
+function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { t, language, toggleLanguage } = useTranslation();
   const { toggleTheme, isDark } = useTheme();
-  const location = useLocation();
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#1a1d21] text-gray-300">
       {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground shrink-0">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-semibold">{t('app.name')}</span>
-            <div className="flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
-              </span>
-              <span className="text-xs text-muted-foreground">{t('app.online')}</span>
-            </div>
-          </div>
-        </div>
+      <div className="p-4 flex items-center justify-between">
+        <span className="font-semibold text-lg text-white">Kotaemon</span>
+        {onClose && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onClose} 
+            className="text-gray-400 hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       {/* New Chat */}
-      <div className="p-3">
-        <Button variant="outline" className="w-full justify-start gap-2" asChild>
+      <div className="px-3 pb-4">
+        <Button 
+          className="w-full justify-start gap-3 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10"
+          asChild
+        >
           <NavLink to="/">
             <Plus className="h-4 w-4" />
             {t('nav.newChat')}
@@ -75,17 +72,17 @@ function SidebarContent() {
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-3">
+      <ScrollArea className="flex-1 px-3 custom-scrollbar">
         <nav className="space-y-1">
           {mainNavItems.map((item) => (
             <NavLink
               key={item.key}
               to={item.path}
               className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                 isActive 
-                  ? "bg-accent text-accent-foreground font-medium" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-white/10 text-white" 
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -94,19 +91,19 @@ function SidebarContent() {
           ))}
         </nav>
 
-        <div className="my-4 border-t" />
+        <div className="my-6 border-t border-white/10" />
 
-        <p className="px-3 mb-2 text-xs font-medium text-muted-foreground">Admin</p>
+        <p className="px-3 mb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</p>
         <nav className="space-y-1">
           {adminNavItems.map((item) => (
             <NavLink
               key={item.key}
               to={item.path}
               className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                 isActive 
-                  ? "bg-accent text-accent-foreground font-medium" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-white/10 text-white" 
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -117,12 +114,22 @@ function SidebarContent() {
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-3 border-t flex gap-2">
-        <Button variant="ghost" size="icon" onClick={toggleTheme}>
+      <div className="p-3 border-t border-white/10 flex items-center gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggleTheme}
+          className="text-gray-400 hover:bg-white/10 hover:text-white"
+        >
           {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
         </Button>
-        <Button variant="ghost" size="icon" onClick={toggleLanguage}>
-          <span className="text-xs font-semibold uppercase">{language}</span>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={toggleLanguage}
+          className="px-3 text-gray-400 hover:bg-white/10 hover:text-white"
+        >
+          <span className="text-xs font-semibold">{language === 'ro' ? 'RO' : 'EN'}</span>
         </Button>
       </div>
     </div>
@@ -131,6 +138,7 @@ function SidebarContent() {
 
 export function MainLayout() {
   const { sidebarOpen, setSidebarOpen, sourcesPanelOpen, toggleSourcesPanel } = useUIStore();
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const location = useLocation();
   const showSourcesPanel = location.pathname === '/' && sourcesPanelOpen && !isMobile;
@@ -139,7 +147,7 @@ export function MainLayout() {
     <div className="flex min-h-screen w-full bg-background">
       {/* Desktop Sidebar */}
       {!isMobile && (
-        <aside className="w-64 border-r bg-sidebar shrink-0">
+        <aside className="w-64 shrink-0">
           <SidebarContent />
         </aside>
       )}
@@ -147,37 +155,41 @@ export function MainLayout() {
       {/* Mobile Sidebar */}
       {isMobile && (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-64">
-            <SidebarContent />
+          <SheetContent side="left" className="p-0 w-72 border-0 bg-[#1a1d21]">
+            <SidebarContent onClose={() => setSidebarOpen(false)} />
           </SheetContent>
         </Sheet>
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-background">
         {/* Mobile header */}
         {isMobile && (
-          <header className="flex h-14 items-center gap-4 border-b px-4">
+          <header className="flex h-14 items-center gap-4 border-b bg-white dark:bg-background px-4">
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
+            <span className="font-semibold">Kotaemon</span>
           </header>
         )}
 
         <div className="flex flex-1 min-h-0">
-          <main className={cn("flex-1 min-w-0 flex flex-col", showSourcesPanel && "md:mr-80")}>
+          <main className={cn("flex-1 min-w-0 flex flex-col bg-[#f7f7f8] dark:bg-background", showSourcesPanel && "lg:mr-80")}>
             <Outlet />
           </main>
 
+          {/* Sources panel */}
           {showSourcesPanel && (
-            <aside className="fixed right-0 top-0 bottom-0 w-80 border-l bg-muted/30 p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold">Surse</h2>
+            <aside className="fixed right-0 top-0 bottom-0 w-80 border-l bg-white dark:bg-card hidden lg:block">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h2 className="font-semibold">{t('sources.title')}</h2>
                 <Button variant="ghost" size="icon" onClick={toggleSourcesPanel}>
                   <PanelRightClose className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">Nu există surse pentru această conversație.</p>
+              <div className="p-4">
+                <p className="text-sm text-muted-foreground">{t('sources.noSources')}</p>
+              </div>
             </aside>
           )}
         </div>

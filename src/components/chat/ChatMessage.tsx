@@ -3,11 +3,10 @@ import { cn } from '@/lib/utils';
 import { SafeMarkdown } from './SafeMarkdown';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useChatStore } from '@/store/appStore';
 import type { Message as MessageType } from '@/types';
 import {
   User,
-  Sparkles,
+  Bot,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -37,59 +36,54 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     <div
       className={cn(
-        "message-enter py-6 px-4 md:px-8",
-        isUser ? "bg-chat-user-bg" : "bg-chat-assistant-bg"
+        "message-enter py-8 px-6",
+        isUser ? "bg-background" : "bg-muted/30"
       )}
     >
       <div className="max-w-3xl mx-auto flex gap-4">
         {/* Avatar */}
         <div
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
             isUser
               ? "bg-primary text-primary-foreground"
-              : "bg-accent text-accent-foreground"
+              : "bg-primary/10 text-primary"
           )}
         >
           {isUser ? (
             <User className="h-4 w-4" />
           ) : (
-            <Sparkles className="h-4 w-4" />
+            <Bot className="h-5 w-5" />
           )}
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 space-y-2">
-          {/* Message content */}
-          <div
-            className={cn(
-              "text-sm leading-relaxed",
-              isUser ? "text-chat-user-fg" : "text-chat-assistant-fg"
-            )}
-          >
+        <div className="flex-1 min-w-0 space-y-2 pt-1">
+          <p className="text-sm font-medium text-foreground mb-2">
+            {isUser ? 'Tu' : 'Kotaemon'}
+          </p>
+          
+          <div className="text-foreground leading-relaxed">
             {isUser ? (
-              // User messages are plain text
               <p className="whitespace-pre-wrap">{message.content}</p>
             ) : (
-              // Assistant messages rendered as Markdown
               <>
                 <SafeMarkdown content={message.content} />
                 {isStreaming && (
                   <span className="inline-flex ml-1">
-                    <span className="animate-pulse">▊</span>
+                    <span className="animate-pulse text-primary">▊</span>
                   </span>
                 )}
               </>
             )}
           </div>
 
-          {/* Metadata toggle (assistant only) */}
           {!isUser && hasMetadata && !isStreaming && (
-            <div className="pt-2">
+            <div className="pt-3">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-muted-foreground"
+                className="h-7 text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => setShowMetadata(!showMetadata)}
               >
                 {showMetadata ? (
@@ -130,13 +124,12 @@ export const ChatMessage = memo(function ChatMessage({
   );
 });
 
-// Typing indicator component
 export function TypingIndicator() {
   return (
-    <div className="py-6 px-4 md:px-8 bg-chat-assistant-bg">
+    <div className="py-8 px-6 bg-muted/30">
       <div className="max-w-3xl mx-auto flex gap-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-          <Sparkles className="h-4 w-4" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Bot className="h-5 w-5" />
         </div>
         <div className="flex items-center gap-1 py-3">
           <span className="typing-dot" />
