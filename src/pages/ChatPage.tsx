@@ -43,7 +43,7 @@ export default function ChatPage() {
   } = useChatStore();
 
   const { currentProjectId, projects, getProjectsForUser } = useProjectsStore();
-  const { addConversation, getConversationsForUser } = useConversationsStore();
+  const { addConversation, getConversationsForUser, updateConversation } = useConversationsStore();
   const { user } = useAuthStore();
   const { workspaces, currentWorkspaceId } = useWorkspaceStore();
 
@@ -85,11 +85,20 @@ export default function ChatPage() {
         title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        messageCount: 0,
+        messageCount: 1, // Start with 1 for the user message
         projectId: currentProjectId || undefined,
       };
       addConversation(newConversation);
       setCurrentConversation(convId);
+    } else {
+      // Update existing conversation's messageCount and timestamp
+      const existingConv = getConversationsForUser(user?.id || '').find(c => c.id === convId);
+      if (existingConv) {
+        updateConversation(convId, {
+          messageCount: existingConv.messageCount + 1,
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
 
     const userMessage: Message = {
@@ -135,12 +144,22 @@ export default function ChatPage() {
           setIsTyping(false);
           const assistantMessage: Message = {
             id: messageId,
-            conversationId: currentConversationId || 'temp',
+            conversationId: convId,
             role: 'assistant',
             content: finalText,
             createdAt: new Date().toISOString(),
           };
           addMessage(assistantMessage);
+          
+          // Update conversation messageCount for assistant response
+          const existingConv = getConversationsForUser(user?.id || '').find(c => c.id === convId);
+          if (existingConv) {
+            updateConversation(convId, {
+              messageCount: existingConv.messageCount + 1,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+          
           stopStreaming();
           scrollToBottom();
         },
