@@ -57,6 +57,7 @@ const translations: Record<Language, Translations> = {
       chat: 'Chat',
       library: 'Bibliotecă PDF',
       conversations: 'Conversații',
+      projects: 'Proiecte',
       admin: 'Admin',
       adminPrompt: 'Prompt Sistem',
       adminRag: 'Setări RAG',
@@ -64,6 +65,36 @@ const translations: Record<Language, Translations> = {
       login: 'Autentificare',
       logout: 'Deconectare',
       newChat: 'Conversație nouă',
+      newProject: 'Proiect nou',
+    },
+    
+    // Projects
+    projects: {
+      title: 'Proiecte',
+      create: 'Creează proiect',
+      edit: 'Editează proiect',
+      delete: 'Șterge proiect',
+      name: 'Nume proiect',
+      namePlaceholder: 'Ex: Cercetare doctorat...',
+      description: 'Descriere',
+      descriptionPlaceholder: 'Despre ce este acest proiect...',
+      color: 'Culoare',
+      conversations: 'conversații',
+      noConversations: 'Nicio conversație încă',
+      moveToProject: 'Mută în proiect',
+      removeFromProject: 'Scoate din proiect',
+      emptyState: 'Niciun proiect creat',
+      emptyStateDescription: 'Creează un proiect pentru a organiza conversațiile.',
+      deleteConfirm: 'Sigur vrei să ștergi acest proiect? Conversațiile vor fi păstrate.',
+    },
+    
+    // Export
+    export: {
+      title: 'Exportă conversația',
+      markdown: 'Exportă Markdown',
+      pdf: 'Exportă PDF',
+      success: 'Conversația a fost exportată',
+      error: 'Eroare la export',
     },
     
     // Chat
@@ -340,6 +371,7 @@ const translations: Record<Language, Translations> = {
       chat: 'Chat',
       library: 'PDF Library',
       conversations: 'Conversations',
+      projects: 'Projects',
       admin: 'Admin',
       adminPrompt: 'System Prompt',
       adminRag: 'RAG Settings',
@@ -347,6 +379,36 @@ const translations: Record<Language, Translations> = {
       login: 'Login',
       logout: 'Logout',
       newChat: 'New conversation',
+      newProject: 'New project',
+    },
+    
+    // Projects
+    projects: {
+      title: 'Projects',
+      create: 'Create project',
+      edit: 'Edit project',
+      delete: 'Delete project',
+      name: 'Project name',
+      namePlaceholder: 'E.g.: PhD research...',
+      description: 'Description',
+      descriptionPlaceholder: 'What is this project about...',
+      color: 'Color',
+      conversations: 'conversations',
+      noConversations: 'No conversations yet',
+      moveToProject: 'Move to project',
+      removeFromProject: 'Remove from project',
+      emptyState: 'No projects created',
+      emptyStateDescription: 'Create a project to organize your conversations.',
+      deleteConfirm: 'Are you sure you want to delete this project? Conversations will be kept.',
+    },
+    
+    // Export
+    export: {
+      title: 'Export conversation',
+      markdown: 'Export Markdown',
+      pdf: 'Export PDF',
+      success: 'Conversation exported',
+      error: 'Export error',
     },
     
     // Chat

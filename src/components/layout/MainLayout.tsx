@@ -1,6 +1,6 @@
 import React from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { useUIStore } from '@/store/appStore';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useUIStore, useChatStore } from '@/store/appStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useTheme } from '@/hooks/useTheme';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { ReasoningPanel } from './ReasoningPanel';
+import { ProjectList } from '@/components/projects';
 import {
   MessageSquare,
   FolderOpen,
@@ -23,6 +24,7 @@ import {
   Menu,
   PanelRightClose,
   X,
+  FolderKanban,
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -41,6 +43,21 @@ const adminNavItems = [
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { t, language, toggleLanguage } = useTranslation();
   const { toggleTheme, isDark } = useTheme();
+  const navigate = useNavigate();
+  const { clearChat, setCurrentConversation } = useChatStore();
+
+  const handleNewChat = () => {
+    clearChat();
+    setCurrentConversation(null);
+    navigate('/');
+    onClose?.();
+  };
+
+  const handleConversationClick = (conversationId: string) => {
+    setCurrentConversation(conversationId);
+    navigate('/');
+    onClose?.();
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#1a1d21] text-gray-300">
@@ -63,12 +80,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       <div className="px-3 pb-4">
         <Button 
           className="w-full justify-start gap-3 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10"
-          asChild
+          onClick={handleNewChat}
         >
-          <NavLink to="/">
-            <Plus className="h-4 w-4" />
-            {t('nav.newChat')}
-          </NavLink>
+          <Plus className="h-4 w-4" />
+          {t('nav.newChat')}
         </Button>
       </div>
 
@@ -85,12 +100,23 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                   ? "bg-white/10 text-white" 
                   : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
               )}
+              onClick={onClose}
             >
               <item.icon className="h-4 w-4" />
               {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>
+
+        {/* Projects Section */}
+        <div className="my-6 border-t border-white/10" />
+        <div className="flex items-center gap-2 px-3 mb-2">
+          <FolderKanban className="h-4 w-4 text-gray-500" />
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            {t('nav.projects')}
+          </p>
+        </div>
+        <ProjectList onConversationClick={handleConversationClick} />
 
         <div className="my-6 border-t border-white/10" />
 
@@ -106,6 +132,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                   ? "bg-white/10 text-white" 
                   : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
               )}
+              onClick={onClose}
             >
               <item.icon className="h-4 w-4" />
               {t(item.labelKey)}
