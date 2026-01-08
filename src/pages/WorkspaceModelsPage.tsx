@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Settings, Save, Loader2, Cpu, Thermometer, Hash, Brain, Sparkles } from 'lucide-react';
+import { Save, Loader2, Cpu, Plus, Trash2, Database, Zap, ChevronDown, ChevronUp, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import {
   Select,
@@ -14,32 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import { getWorkspaceSettings, saveWorkspaceSettings } from '@/db/repo';
-import type { ModelSettings, ReasoningMode } from '@/types/database';
+import type { ModelSettings, EndpointConfig, ReasoningMode } from '@/types/database';
 import { DEFAULT_MODEL_SETTINGS } from '@/types/database';
-
-const LLM_MODELS = [
-  { value: 'gpt-4o', label: 'GPT-4o' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-  { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-  { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5' },
-  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-];
-
-const EMBEDDING_MODELS = [
-  { value: 'text-embedding-3-small', label: 'OpenAI Embedding Small' },
-  { value: 'text-embedding-3-large', label: 'OpenAI Embedding Large' },
-  { value: 'text-embedding-ada-002', label: 'OpenAI Ada 002' },
-];
-
-const RERANKER_MODELS = [
-  { value: 'cohere-rerank-v3', label: 'Cohere Rerank v3' },
-  { value: 'bge-reranker-large', label: 'BGE Reranker Large' },
-  { value: 'cross-encoder', label: 'Cross-Encoder' },
-];
+import { v4 as uuidv4 } from 'uuid';
 
 const REASONING_MODES: { value: ReasoningMode; label: string; description: string }[] = [
   { value: 'off', label: 'Dezactivat', description: 'Fără raționament extins' },
@@ -47,6 +31,124 @@ const REASONING_MODES: { value: ReasoningMode; label: string; description: strin
   { value: 'medium', label: 'Mediu', description: 'Raționament echilibrat' },
   { value: 'high', label: 'Înalt', description: 'Raționament detaliat' },
 ];
+
+interface EndpointFormProps {
+  endpoint: EndpointConfig;
+  onChange: (endpoint: EndpointConfig) => void;
+  onDelete: () => void;
+  showContextWindow?: boolean;
+  showTemperature?: boolean;
+  showMaxTokens?: boolean;
+}
+
+function EndpointForm({ endpoint, onChange, onDelete, showContextWindow, showTemperature, showMaxTokens }: EndpointFormProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg bg-muted/20">
+      <CollapsibleTrigger asChild>
+        <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/40 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Cpu className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium">{endpoint.name || 'Model nou'}</p>
+              <p className="text-sm text-muted-foreground truncate max-w-[300px]">
+                {endpoint.endpoint || 'Configurează endpoint-ul'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="p-4 pt-0 space-y-4 border-t">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Nume Model</Label>
+              <Input
+                value={endpoint.name}
+                onChange={(e) => onChange({ ...endpoint, name: e.target.value })}
+                placeholder="ex: GPT-4o, Claude Sonnet"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>API Key</Label>
+              <Input
+                type="password"
+                value={endpoint.apiKey || ''}
+                onChange={(e) => onChange({ ...endpoint, apiKey: e.target.value })}
+                placeholder="sk-..."
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Endpoint URL</Label>
+            <Input
+              value={endpoint.endpoint}
+              onChange={(e) => onChange({ ...endpoint, endpoint: e.target.value })}
+              placeholder="https://api.example.com/v1/chat/completions"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            {showContextWindow && (
+              <div className="space-y-2">
+                <Label>Context Window</Label>
+                <Input
+                  type="number"
+                  value={endpoint.contextWindow || ''}
+                  onChange={(e) => onChange({ ...endpoint, contextWindow: e.target.value ? parseInt(e.target.value) : undefined })}
+                  placeholder="128000"
+                />
+              </div>
+            )}
+            {showTemperature && (
+              <div className="space-y-2">
+                <Label>Temperature</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  value={endpoint.temperature ?? ''}
+                  onChange={(e) => onChange({ ...endpoint, temperature: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  placeholder="0.7"
+                />
+              </div>
+            )}
+            {showMaxTokens && (
+              <div className="space-y-2">
+                <Label>Max Tokens</Label>
+                <Input
+                  type="number"
+                  value={endpoint.maxTokens || ''}
+                  onChange={(e) => onChange({ ...endpoint, maxTokens: e.target.value ? parseInt(e.target.value) : undefined })}
+                  placeholder="4096"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export default function WorkspaceModelsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -67,7 +169,8 @@ export default function WorkspaceModelsPage() {
     try {
       const wsSettings = await getWorkspaceSettings(workspaceId);
       if (wsSettings?.modelSettings) {
-        setSettings(wsSettings.modelSettings);
+        // Merge with defaults to ensure new fields exist
+        setSettings({ ...DEFAULT_MODEL_SETTINGS, ...wsSettings.modelSettings });
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -97,8 +200,106 @@ export default function WorkspaceModelsPage() {
     }
   };
 
-  const updateSetting = <K extends keyof ModelSettings>(key: K, value: ModelSettings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+  const addLlmEndpoint = () => {
+    const newEndpoint: EndpointConfig = {
+      id: uuidv4(),
+      name: '',
+      endpoint: '',
+    };
+    setSettings(prev => ({
+      ...prev,
+      llmEndpoints: [...prev.llmEndpoints, newEndpoint],
+      selectedLlmId: prev.llmEndpoints.length === 0 ? newEndpoint.id : prev.selectedLlmId,
+    }));
+  };
+
+  const updateLlmEndpoint = (index: number, endpoint: EndpointConfig) => {
+    setSettings(prev => ({
+      ...prev,
+      llmEndpoints: prev.llmEndpoints.map((e, i) => i === index ? endpoint : e),
+    }));
+  };
+
+  const deleteLlmEndpoint = (index: number) => {
+    const endpoint = settings.llmEndpoints[index];
+    setSettings(prev => {
+      const newEndpoints = prev.llmEndpoints.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        llmEndpoints: newEndpoints,
+        selectedLlmId: prev.selectedLlmId === endpoint.id 
+          ? (newEndpoints[0]?.id || undefined)
+          : prev.selectedLlmId,
+      };
+    });
+  };
+
+  const addVectorDbEndpoint = () => {
+    const newEndpoint: EndpointConfig = {
+      id: uuidv4(),
+      name: '',
+      endpoint: '',
+    };
+    setSettings(prev => ({
+      ...prev,
+      vectorDbEndpoints: [...prev.vectorDbEndpoints, newEndpoint],
+      selectedVectorDbId: prev.vectorDbEndpoints.length === 0 ? newEndpoint.id : prev.selectedVectorDbId,
+    }));
+  };
+
+  const updateVectorDbEndpoint = (index: number, endpoint: EndpointConfig) => {
+    setSettings(prev => ({
+      ...prev,
+      vectorDbEndpoints: prev.vectorDbEndpoints.map((e, i) => i === index ? endpoint : e),
+    }));
+  };
+
+  const deleteVectorDbEndpoint = (index: number) => {
+    const endpoint = settings.vectorDbEndpoints[index];
+    setSettings(prev => {
+      const newEndpoints = prev.vectorDbEndpoints.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        vectorDbEndpoints: newEndpoints,
+        selectedVectorDbId: prev.selectedVectorDbId === endpoint.id 
+          ? (newEndpoints[0]?.id || undefined)
+          : prev.selectedVectorDbId,
+      };
+    });
+  };
+
+  const addRerankerEndpoint = () => {
+    const newEndpoint: EndpointConfig = {
+      id: uuidv4(),
+      name: '',
+      endpoint: '',
+    };
+    setSettings(prev => ({
+      ...prev,
+      rerankerEndpoints: [...prev.rerankerEndpoints, newEndpoint],
+      selectedRerankerId: prev.rerankerEndpoints.length === 0 ? newEndpoint.id : prev.selectedRerankerId,
+    }));
+  };
+
+  const updateRerankerEndpoint = (index: number, endpoint: EndpointConfig) => {
+    setSettings(prev => ({
+      ...prev,
+      rerankerEndpoints: prev.rerankerEndpoints.map((e, i) => i === index ? endpoint : e),
+    }));
+  };
+
+  const deleteRerankerEndpoint = (index: number) => {
+    const endpoint = settings.rerankerEndpoints[index];
+    setSettings(prev => {
+      const newEndpoints = prev.rerankerEndpoints.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        rerankerEndpoints: newEndpoints,
+        selectedRerankerId: prev.selectedRerankerId === endpoint.id 
+          ? (newEndpoints[0]?.id || undefined)
+          : prev.selectedRerankerId,
+      };
+    });
   };
 
   if (isLoading) {
@@ -132,85 +333,53 @@ export default function WorkspaceModelsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                Model LLM
+                <Cpu className="h-5 w-5" />
+                LLM Provider
               </CardTitle>
               <CardDescription>
-                Configurează modelul de limbaj pentru generarea răspunsurilor.
+                Configurează endpoint-urile pentru modelele LLM.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Model</Label>
-                <Select
-                  value={settings.llmModel}
-                  onValueChange={(v) => updateSetting('llmModel', v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LLM_MODELS.map((model) => (
-                      <SelectItem key={model.value} value={model.value}>
-                        {model.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CardContent className="space-y-4">
+              {settings.llmEndpoints.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Model activ</Label>
+                  <Select
+                    value={settings.selectedLlmId || ''}
+                    onValueChange={(v) => setSettings(prev => ({ ...prev, selectedLlmId: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selectează un model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {settings.llmEndpoints.map((endpoint) => (
+                        <SelectItem key={endpoint.id} value={endpoint.id}>
+                          {endpoint.name || 'Model fără nume'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {settings.llmEndpoints.map((endpoint, index) => (
+                  <EndpointForm
+                    key={endpoint.id}
+                    endpoint={endpoint}
+                    onChange={(e) => updateLlmEndpoint(index, e)}
+                    onDelete={() => deleteLlmEndpoint(index)}
+                    showContextWindow
+                    showTemperature
+                    showMaxTokens
+                  />
+                ))}
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <Thermometer className="h-4 w-4" />
-                      Temperatură
-                    </Label>
-                    <span className="text-sm text-muted-foreground">{settings.temperature}</span>
-                  </div>
-                  <Slider
-                    value={[settings.temperature]}
-                    onValueChange={([v]) => updateSetting('temperature', v)}
-                    min={0}
-                    max={2}
-                    step={0.1}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Valori mai mici = răspunsuri mai precise, mai mari = mai creative
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <Hash className="h-4 w-4" />
-                      Max Tokens
-                    </Label>
-                    <span className="text-sm text-muted-foreground">{settings.maxTokens}</span>
-                  </div>
-                  <Slider
-                    value={[settings.maxTokens]}
-                    onValueChange={([v]) => updateSetting('maxTokens', v)}
-                    min={256}
-                    max={16384}
-                    step={256}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Top P</Label>
-                    <span className="text-sm text-muted-foreground">{settings.topP}</span>
-                  </div>
-                  <Slider
-                    value={[settings.topP]}
-                    onValueChange={([v]) => updateSetting('topP', v)}
-                    min={0}
-                    max={1}
-                    step={0.05}
-                  />
-                </div>
-              </div>
+              <Button variant="outline" onClick={addLlmEndpoint} className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Adaugă model LLM
+              </Button>
             </CardContent>
           </Card>
 
@@ -230,7 +399,7 @@ export default function WorkspaceModelsPage() {
                 <Label>Mod raționament</Label>
                 <Select
                   value={settings.reasoningMode}
-                  onValueChange={(v) => updateSetting('reasoningMode', v as ReasoningMode)}
+                  onValueChange={(v) => setSettings(prev => ({ ...prev, reasoningMode: v as ReasoningMode }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -257,7 +426,10 @@ export default function WorkspaceModelsPage() {
                     type="number"
                     value={settings.reasoningBudget || ''}
                     onChange={(e) =>
-                      updateSetting('reasoningBudget', e.target.value ? parseInt(e.target.value) : undefined)
+                      setSettings(prev => ({ 
+                        ...prev, 
+                        reasoningBudget: e.target.value ? parseInt(e.target.value) : undefined 
+                      }))
                     }
                     placeholder="Auto"
                   />
@@ -269,40 +441,64 @@ export default function WorkspaceModelsPage() {
             </CardContent>
           </Card>
 
-          {/* Embeddings Settings */}
+          {/* Vector Database Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Embeddings</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Vector Database Provider
+              </CardTitle>
               <CardDescription>
-                Modelul pentru generarea reprezentărilor vectoriale.
+                Configurează endpoint-ul pentru baza de date vectorială.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label>Model Embeddings</Label>
-                <Select
-                  value={settings.embeddingsModel}
-                  onValueChange={(v) => updateSetting('embeddingsModel', v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EMBEDDING_MODELS.map((model) => (
-                      <SelectItem key={model.value} value={model.value}>
-                        {model.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CardContent className="space-y-4">
+              {settings.vectorDbEndpoints.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Database activ</Label>
+                  <Select
+                    value={settings.selectedVectorDbId || ''}
+                    onValueChange={(v) => setSettings(prev => ({ ...prev, selectedVectorDbId: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selectează o bază de date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {settings.vectorDbEndpoints.map((endpoint) => (
+                        <SelectItem key={endpoint.id} value={endpoint.id}>
+                          {endpoint.name || 'Database fără nume'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {settings.vectorDbEndpoints.map((endpoint, index) => (
+                  <EndpointForm
+                    key={endpoint.id}
+                    endpoint={endpoint}
+                    onChange={(e) => updateVectorDbEndpoint(index, e)}
+                    onDelete={() => deleteVectorDbEndpoint(index)}
+                  />
+                ))}
               </div>
+
+              <Button variant="outline" onClick={addVectorDbEndpoint} className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Adaugă Vector Database
+              </Button>
             </CardContent>
           </Card>
 
           {/* Reranker Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Reranker</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                Reranker
+              </CardTitle>
               <CardDescription>
                 Reordonează rezultatele căutării pentru relevanță mai bună.
               </CardDescription>
@@ -317,29 +513,49 @@ export default function WorkspaceModelsPage() {
                 </div>
                 <Switch
                   checked={settings.rerankerEnabled}
-                  onCheckedChange={(v) => updateSetting('rerankerEnabled', v)}
+                  onCheckedChange={(v) => setSettings(prev => ({ ...prev, rerankerEnabled: v }))}
                 />
               </div>
 
               {settings.rerankerEnabled && (
-                <div className="space-y-2">
-                  <Label>Model Reranker</Label>
-                  <Select
-                    value={settings.rerankerModel || RERANKER_MODELS[0].value}
-                    onValueChange={(v) => updateSetting('rerankerModel', v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RERANKER_MODELS.map((model) => (
-                        <SelectItem key={model.value} value={model.value}>
-                          {model.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  {settings.rerankerEndpoints.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Reranker activ</Label>
+                      <Select
+                        value={settings.selectedRerankerId || ''}
+                        onValueChange={(v) => setSettings(prev => ({ ...prev, selectedRerankerId: v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selectează un reranker" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {settings.rerankerEndpoints.map((endpoint) => (
+                            <SelectItem key={endpoint.id} value={endpoint.id}>
+                              {endpoint.name || 'Reranker fără nume'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {settings.rerankerEndpoints.map((endpoint, index) => (
+                      <EndpointForm
+                        key={endpoint.id}
+                        endpoint={endpoint}
+                        onChange={(e) => updateRerankerEndpoint(index, e)}
+                        onDelete={() => deleteRerankerEndpoint(index)}
+                      />
+                    ))}
+                  </div>
+
+                  <Button variant="outline" onClick={addRerankerEndpoint} className="w-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adaugă Reranker
+                  </Button>
+                </>
               )}
             </CardContent>
           </Card>

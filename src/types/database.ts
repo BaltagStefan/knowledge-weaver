@@ -75,26 +75,43 @@ export interface DBFileIndexState {
 }
 
 // ============================================
+// Custom Endpoint Configuration
+// ============================================
+export interface EndpointConfig {
+  id: string;
+  name: string;
+  endpoint: string;
+  apiKey?: string;
+  contextWindow?: number;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+// ============================================
 // Workspace Settings Table
 // ============================================
 export interface ModelSettings {
-  llmModel: string;
-  temperature: number;
-  maxTokens: number;
-  topP: number;
+  // LLM Configuration
+  llmEndpoints: EndpointConfig[];
+  selectedLlmId?: string;
+  
+  // Vector Database Configuration
+  vectorDbEndpoints: EndpointConfig[];
+  selectedVectorDbId?: string;
+  
+  // Reranker Configuration
+  rerankerEnabled: boolean;
+  rerankerEndpoints: EndpointConfig[];
+  selectedRerankerId?: string;
+  
+  // Reasoning settings
   reasoningMode: ReasoningMode;
   reasoningBudget?: number;
-  embeddingsModel: string;
-  rerankerEnabled: boolean;
-  rerankerModel?: string;
 }
 
 export interface RAGSettings {
-  chunkSize: number;
-  chunkOverlap: number;
-  topK: number;
-  threshold: number;
-  citationsVerbosity: 'minimal' | 'normal' | 'detailed';
+  chatHistoryCount: number;
+  chunksCount: number;
 }
 
 export interface DBWorkspaceSettings {
@@ -131,23 +148,20 @@ export interface DBAppCache {
 // Default Values
 // ============================================
 export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
-  llmModel: 'gpt-4o',
-  temperature: 0.7,
-  maxTokens: 4096,
-  topP: 1,
+  llmEndpoints: [],
+  selectedLlmId: undefined,
+  vectorDbEndpoints: [],
+  selectedVectorDbId: undefined,
+  rerankerEnabled: false,
+  rerankerEndpoints: [],
+  selectedRerankerId: undefined,
   reasoningMode: 'off',
   reasoningBudget: undefined,
-  embeddingsModel: 'text-embedding-3-small',
-  rerankerEnabled: false,
-  rerankerModel: undefined,
 };
 
 export const DEFAULT_RAG_SETTINGS: RAGSettings = {
-  chunkSize: 512,
-  chunkOverlap: 50,
-  topK: 5,
-  threshold: 0.7,
-  citationsVerbosity: 'normal',
+  chatHistoryCount: 10,
+  chunksCount: 5,
 };
 
 export const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant that answers questions based on the provided documents. 
