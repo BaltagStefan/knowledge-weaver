@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CodeBlock, CodeWithConfig } from '@/components/docs/CodeBlock';
+import { MigrationChecker, MigrationGuide } from '@/components/migration';
 import { 
   Database, 
   Server, 
@@ -27,7 +28,8 @@ import {
   Code,
   FileJson,
   Info,
-  BookOpen
+  BookOpen,
+  GitCompare
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -48,8 +50,12 @@ export default function DocsPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs defaultValue="migration" className="space-y-6">
           <TabsList className="flex flex-wrap h-auto gap-2">
+            <TabsTrigger value="migration" className="flex items-center gap-1">
+              <GitCompare className="h-3.5 w-3.5" />
+              Migrare
+            </TabsTrigger>
             <TabsTrigger value="overview">Prezentare</TabsTrigger>
             <TabsTrigger value="setup">Setup & Config</TabsTrigger>
             <TabsTrigger value="n8n">n8n Workflows</TabsTrigger>
@@ -59,6 +65,12 @@ export default function DocsPage() {
             <TabsTrigger value="stores">State Management</TabsTrigger>
             <TabsTrigger value="components">Componente</TabsTrigger>
           </TabsList>
+
+          {/* Migration Tab - Default */}
+          <TabsContent value="migration" className="space-y-6">
+            <MigrationChecker />
+            <MigrationGuide />
+          </TabsContent>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
