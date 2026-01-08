@@ -483,7 +483,6 @@ export default function WorkspaceModelsPage() {
                     onDelete={() => deleteLlmEndpoint(index)}
                     onTest={testLlmConnection}
                     showContextWindow
-                    showTemperature
                     showMaxTokens
                   />
                 ))}

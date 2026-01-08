@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileText, Save, Loader2, History, RotateCcw, Plus } from 'lucide-react';
+import { FileText, Save, Loader2, History, RotateCcw, Thermometer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -30,8 +31,8 @@ import {
   listPromptVersions,
 } from '@/db/repo';
 import { useAuthStore } from '@/store/authStore';
-import type { DBPromptVersion } from '@/types/database';
-import { DEFAULT_SYSTEM_PROMPT } from '@/types/database';
+import type { DBPromptVersion, ModelSettings } from '@/types/database';
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_MODEL_SETTINGS } from '@/types/database';
 
 export default function WorkspacePromptPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -39,6 +40,7 @@ export default function WorkspacePromptPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [prompt, setPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
+  const [temperature, setTemperature] = useState(0.7);
   const [versions, setVersions] = useState<DBPromptVersion[]>([]);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [versionNote, setVersionNote] = useState('');
@@ -62,6 +64,9 @@ export default function WorkspacePromptPage() {
       if (settings?.systemPrompt) {
         setPrompt(settings.systemPrompt);
       }
+      if (settings?.modelSettings?.llmEndpoints?.[0]?.temperature !== undefined) {
+        setTemperature(settings.modelSettings.llmEndpoints[0].temperature);
+      }
       setVersions(promptVersions);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -75,8 +80,24 @@ export default function WorkspacePromptPage() {
 
     setIsSaving(true);
     try {
-      // Save the prompt
-      await saveWorkspaceSettings(workspaceId, { systemPrompt: prompt });
+      // Get current settings to preserve other model settings
+      const currentSettings = await getWorkspaceSettings(workspaceId);
+      const modelSettings = currentSettings?.modelSettings || DEFAULT_MODEL_SETTINGS;
+      
+      // Update temperature in all LLM endpoints
+      const updatedLlmEndpoints = modelSettings.llmEndpoints.map(endpoint => ({
+        ...endpoint,
+        temperature,
+      }));
+      
+      // Save the prompt and temperature
+      await saveWorkspaceSettings(workspaceId, { 
+        systemPrompt: prompt,
+        modelSettings: {
+          ...modelSettings,
+          llmEndpoints: updatedLlmEndpoints,
+        }
+      });
 
       // Create a version entry
       const version = await addPromptVersion(
@@ -150,6 +171,37 @@ export default function WorkspacePromptPage() {
                 {prompt.length} caractere • {prompt.split(/\s+/).filter(Boolean).length} cuvinte
               </p>
             </div>
+
+            {/* Temperature Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Thermometer className="h-4 w-4" />
+                  Temperature
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Controlează creativitatea răspunsurilor (0 = precis, 2 = creativ)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[temperature]}
+                    onValueChange={([value]) => setTemperature(value)}
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-mono w-12 text-right">{temperature.toFixed(1)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Precis</span>
+                  <span>Echilibrat</span>
+                  <span>Creativ</span>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="pb-3">

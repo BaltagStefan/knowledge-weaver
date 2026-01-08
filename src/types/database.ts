@@ -112,6 +112,8 @@ export interface ModelSettings {
 export interface RAGSettings {
   chatHistoryCount: number;
   chunksCount: number;
+  chunkSize: number;
+  chunkOverlap: number;
 }
 
 export interface DBWorkspaceSettings {
@@ -162,6 +164,8 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
 export const DEFAULT_RAG_SETTINGS: RAGSettings = {
   chatHistoryCount: 10,
   chunksCount: 5,
+  chunkSize: 512,
+  chunkOverlap: 50,
 };
 
 export const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant that answers questions based on the provided documents. 
