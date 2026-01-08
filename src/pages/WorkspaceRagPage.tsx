@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Settings2, Save, Loader2, MessageSquare, Layers } from 'lucide-react';
+import { Settings2, Save, Loader2, MessageSquare, Layers, FileText, Ruler } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -136,6 +136,42 @@ export default function WorkspaceRagPage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Numărul de chunk-uri relevante incluse în răspuns
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Dimensiune Chunk
+                  </Label>
+                  <Input
+                    type="number"
+                    min={100}
+                    max={4000}
+                    step={50}
+                    value={settings.chunkSize}
+                    onChange={(e) => updateSetting('chunkSize', parseInt(e.target.value) || 512)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Dimensiunea fiecărui chunk în caractere
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Ruler className="h-4 w-4" />
+                    Chunk Overlap
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={500}
+                    step={10}
+                    value={settings.chunkOverlap}
+                    onChange={(e) => updateSetting('chunkOverlap', parseInt(e.target.value) || 50)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Suprapunerea între chunk-uri consecutive
                   </p>
                 </div>
               </div>
