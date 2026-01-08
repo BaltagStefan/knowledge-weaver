@@ -19,6 +19,7 @@ import AdminWorkspacesPage from "./pages/AdminWorkspacesPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminMemoryPage from "./pages/AdminMemoryPage";
 import LoginPage from "./pages/LoginPage";
+import DocsPage from "./pages/DocsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -107,6 +108,10 @@ function AppContent() {
         
         {/* Auth */}
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Documentation */}
+        <Route path="/docs" element={<DocsPage />} />
+        
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
