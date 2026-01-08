@@ -31,6 +31,9 @@ import {
   BookOpen
 } from 'lucide-react';
 
+// Placeholder for documentation examples
+const BASE_URL = '{BASE_URL}';
+
 export default function DocsPage() {
   return (
     <div className="min-h-screen bg-background">
