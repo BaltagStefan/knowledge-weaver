@@ -168,7 +168,7 @@ export const useChatStore = create<ChatState>()(
       setCurrentConversation: (conversationId) => {
         const { messagesById, currentConversationId, messages } = get();
         
-        // Save current messages before switching
+        // Save current messages before switching (only if there are messages)
         if (currentConversationId && messages.length > 0) {
           set((state) => ({
             messagesById: {
@@ -178,13 +178,29 @@ export const useChatStore = create<ChatState>()(
           }));
         }
         
+        // If switching to null (new conversation), clear messages immediately
+        if (conversationId === null) {
+          set({ 
+            currentConversationId: null, 
+            messages: [], 
+            currentCitations: [],
+            streamingText: '',
+            reasoningSteps: [],
+            isReasoning: false,
+          });
+          return;
+        }
+        
         // Load messages for the new conversation
-        const newMessages = conversationId ? (messagesById[conversationId] || []) : [];
+        const newMessages = messagesById[conversationId] || [];
         
         set({ 
           currentConversationId: conversationId, 
           messages: newMessages, 
-          currentCitations: [] 
+          currentCitations: [],
+          streamingText: '',
+          reasoningSteps: [],
+          isReasoning: false,
         });
       },
       
