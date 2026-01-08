@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Save, Loader2, Cpu, Plus, Trash2, Database, Zap, ChevronDown, ChevronUp, Brain } from 'lucide-react';
+import { Save, Loader2, Cpu, Plus, Trash2, Database, Zap, ChevronDown, ChevronUp, Brain, CheckCircle2, XCircle, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,17 +32,102 @@ const REASONING_MODES: { value: ReasoningMode; label: string; description: strin
   { value: 'high', label: 'Înalt', description: 'Raționament detaliat' },
 ];
 
+type TestStatus = 'idle' | 'testing' | 'success' | 'error';
+
+const testLlmConnection = async (endpoint: EndpointConfig): Promise<{ success: boolean; message: string }> => {
+  if (!endpoint.endpoint) {
+    return { success: false, message: 'Endpoint-ul nu este configurat' };
+  }
+  
+  try {
+    const response = await fetch(endpoint.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(endpoint.apiKey ? { 'Authorization': `Bearer ${endpoint.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: endpoint.name || 'test',
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 5,
+      }),
+    });
+    
+    if (response.ok) {
+      return { success: true, message: 'Conexiune reușită!' };
+    } else if (response.status === 401) {
+      return { success: false, message: 'API Key invalid sau lipsă' };
+    } else if (response.status === 404) {
+      return { success: false, message: 'Endpoint nu a fost găsit' };
+    } else {
+      return { success: false, message: `Eroare: ${response.status} ${response.statusText}` };
+    }
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      return { success: false, message: 'Nu se poate conecta la endpoint (CORS sau rețea)' };
+    }
+    return { success: false, message: `Eroare: ${error instanceof Error ? error.message : 'Necunoscută'}` };
+  }
+};
+
+const testVectorDbConnection = async (endpoint: EndpointConfig): Promise<{ success: boolean; message: string }> => {
+  if (!endpoint.endpoint) {
+    return { success: false, message: 'Endpoint-ul nu este configurat' };
+  }
+  
+  try {
+    const response = await fetch(endpoint.endpoint, {
+      method: 'GET',
+      headers: {
+        ...(endpoint.apiKey ? { 'api-key': endpoint.apiKey } : {}),
+      },
+    });
+    
+    if (response.ok) {
+      return { success: true, message: 'Conexiune reușită!' };
+    } else if (response.status === 401 || response.status === 403) {
+      return { success: false, message: 'API Key invalid sau lipsă' };
+    } else {
+      return { success: false, message: `Eroare: ${response.status} ${response.statusText}` };
+    }
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      return { success: false, message: 'Nu se poate conecta la endpoint (CORS sau rețea)' };
+    }
+    return { success: false, message: `Eroare: ${error instanceof Error ? error.message : 'Necunoscută'}` };
+  }
+};
+
 interface EndpointFormProps {
   endpoint: EndpointConfig;
   onChange: (endpoint: EndpointConfig) => void;
   onDelete: () => void;
+  onTest: (endpoint: EndpointConfig) => Promise<{ success: boolean; message: string }>;
   showContextWindow?: boolean;
   showTemperature?: boolean;
   showMaxTokens?: boolean;
 }
 
-function EndpointForm({ endpoint, onChange, onDelete, showContextWindow, showTemperature, showMaxTokens }: EndpointFormProps) {
+function EndpointForm({ endpoint, onChange, onDelete, onTest, showContextWindow, showTemperature, showMaxTokens }: EndpointFormProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [testStatus, setTestStatus] = useState<TestStatus>('idle');
+  const [testMessage, setTestMessage] = useState('');
+
+  const handleTest = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTestStatus('testing');
+    setTestMessage('');
+    
+    const result = await onTest(endpoint);
+    setTestStatus(result.success ? 'success' : 'error');
+    setTestMessage(result.message);
+    
+    // Reset status after 5 seconds
+    setTimeout(() => {
+      setTestStatus('idle');
+      setTestMessage('');
+    }, 5000);
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg bg-muted/20">
@@ -142,6 +227,33 @@ function EndpointForm({ endpoint, onChange, onDelete, showContextWindow, showTem
                   placeholder="4096"
                 />
               </div>
+            )}
+          </div>
+
+          {/* Test Connection Button */}
+          <div className="flex items-center gap-3 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTest}
+              disabled={testStatus === 'testing' || !endpoint.endpoint}
+              className="gap-2"
+            >
+              {testStatus === 'testing' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : testStatus === 'success' ? (
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+              ) : testStatus === 'error' ? (
+                <XCircle className="h-4 w-4 text-destructive" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {testStatus === 'testing' ? 'Se testează...' : 'Test conexiune'}
+            </Button>
+            {testMessage && (
+              <span className={`text-sm ${testStatus === 'success' ? 'text-green-600' : 'text-destructive'}`}>
+                {testMessage}
+              </span>
             )}
           </div>
         </div>
@@ -369,6 +481,7 @@ export default function WorkspaceModelsPage() {
                     endpoint={endpoint}
                     onChange={(e) => updateLlmEndpoint(index, e)}
                     onDelete={() => deleteLlmEndpoint(index)}
+                    onTest={testLlmConnection}
                     showContextWindow
                     showTemperature
                     showMaxTokens
@@ -481,6 +594,7 @@ export default function WorkspaceModelsPage() {
                     endpoint={endpoint}
                     onChange={(e) => updateVectorDbEndpoint(index, e)}
                     onDelete={() => deleteVectorDbEndpoint(index)}
+                    onTest={testVectorDbConnection}
                   />
                 ))}
               </div>
@@ -547,6 +661,7 @@ export default function WorkspaceModelsPage() {
                         endpoint={endpoint}
                         onChange={(e) => updateRerankerEndpoint(index, e)}
                         onDelete={() => deleteRerankerEndpoint(index)}
+                        onTest={testLlmConnection}
                       />
                     ))}
                   </div>
