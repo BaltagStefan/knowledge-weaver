@@ -375,6 +375,8 @@ const translations: Record<Language, Translations> = {
       payloadTooLarge: 'Fișierul este prea mare',
       validationError: 'Date invalide',
       copyFailed: 'Nu am putut copia în clipboard',
+      userExists: 'Utilizatorul există deja.',
+      userCreateFailed: 'Nu s-a putut crea utilizatorul.',
     },
     
     // Accessibility
@@ -769,6 +771,8 @@ const translations: Record<Language, Translations> = {
       payloadTooLarge: 'File is too large',
       validationError: 'Invalid data',
       copyFailed: 'Could not copy to clipboard',
+      userExists: 'User already exists.',
+      userCreateFailed: 'Could not create the user.',
     },
     
     // Accessibility

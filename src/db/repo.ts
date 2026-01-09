@@ -65,6 +65,10 @@ export async function createUser(
   email?: string,
   passwordHash?: string
 ): Promise<DBUser> {
+  const existing = await getUserByUsername(username);
+  if (existing) {
+    throw new Error('USERNAME_EXISTS');
+  }
   const now = Date.now();
   const user: DBUser = {
     id: uuidv4(),

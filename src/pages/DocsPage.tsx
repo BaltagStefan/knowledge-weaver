@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CodeBlock, CodeWithConfig } from '@/components/docs/CodeBlock';
 import { apiEndpoints, components, databaseTables, stores } from './docs/data';
 import { useTranslation } from '@/hooks/useTranslation';
+import { MigrationChecker, MigrationGuide } from '@/components/migration';
 import { 
   Database, 
   Server, 

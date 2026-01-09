@@ -27,6 +27,7 @@ import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/use-toast';
 import { listUsers, createUser, assignUserToWorkspace, getWorkspaceMembers } from '@/db/repo';
 import type { DBUser, UserRole } from '@/types/database';
+import { getCreateUserErrorMessage } from '@/lib/errorMessages';
 
 export default function WorkspaceUsersPage() {
   const { t } = useTranslation();
@@ -101,8 +102,8 @@ export default function WorkspaceUsersPage() {
       });
     } catch (error) {
       toast({
-        title: 'Eroare',
-        description: 'Nu s-a putut crea utilizatorul.',
+        title: t('common.error'),
+        description: getCreateUserErrorMessage(error, t),
         variant: 'destructive',
       });
     } finally {

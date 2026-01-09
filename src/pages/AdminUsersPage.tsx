@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
+import { getCreateUserErrorMessage } from '@/lib/errorMessages';
 import { listUsers, listWorkspaces, createUser, assignUserToWorkspace, disableUser } from '@/db/repo';
 import type { DBUser, DBWorkspace, UserRole } from '@/types/database';
 
@@ -92,8 +93,8 @@ export default function AdminUsersPage() {
       });
     } catch (error) {
       toast({
-        title: 'Eroare',
-        description: 'Nu s-a putut crea utilizatorul.',
+        title: t('common.error'),
+        description: getCreateUserErrorMessage(error, t),
         variant: 'destructive',
       });
     } finally {

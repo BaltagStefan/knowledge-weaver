@@ -43,6 +43,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { getCreateUserErrorMessage } from '@/lib/errorMessages';
 import {
   listWorkspaces,
   listUsers,
@@ -208,8 +209,8 @@ export default function AdminWorkspacesPage() {
       });
     } catch (error) {
       toast({
-        title: 'Eroare',
-        description: 'Nu s-a putut crea utilizatorul.',
+        title: t('common.error'),
+        description: getCreateUserErrorMessage(error, t),
         variant: 'destructive',
       });
     } finally {
