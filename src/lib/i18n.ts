@@ -132,6 +132,11 @@ const translations: Record<Language, Translations> = {
       helpful: 'Răspuns util',
       notHelpful: 'Răspuns neutil',
       feedbackThanks: 'Mulțumim pentru feedback!',
+      userLabel: 'Tu',
+      assistantLabel: 'Asistent',
+      hintSend: 'pentru trimitere',
+      hintNewLine: 'pentru linie nouă',
+      hintStop: 'pentru oprire',
     },
     
     // Quick Suggestions
@@ -147,6 +152,7 @@ const translations: Record<Language, Translations> = {
       title: 'Surse & Citări',
       usePdfs: 'Caută în PDF-uri',
       useMemory: 'Caută în memorie',
+      uploadPdf: 'Încarcă PDF',
       selectDocs: 'Selectează documente',
       allDocs: 'Toate documentele',
       noSources: 'Fără surse',
@@ -197,6 +203,53 @@ const translations: Record<Language, Translations> = {
       uploadError: 'Eroare la încărcare',
     },
     
+    // Files
+    files: {
+      title: 'Fișiere PDF',
+      indexNew: 'Indexează fișiere noi',
+      deleteAll: 'Șterge toate fișierele',
+      deleteAllTitle: 'Ștergi toate fișierele?',
+      deleteAllDescription: 'Toate fișierele PDF și stările lor de indexare vor fi șterse. Această acțiune nu poate fi anulată.',
+      deleteAllConfirm: 'Șterge tot',
+      deleteAllSuccessTitle: 'Fișiere șterse',
+      deleteAllSuccessDescription: 'Toate fișierele au fost șterse.',
+      deleteAllErrorDescription: 'Nu s-au putut șterge toate fișierele.',
+      uploadTitle: 'Încarcă fișiere PDF',
+      uploadDrop: 'Plasează fișierele aici',
+      uploadHint: 'Drag & drop sau click pentru a selecta',
+      searchPlaceholder: 'Caută fișiere...',
+      filterAll: 'Toate',
+      filterIndexed: 'Indexate',
+      filterNotIndexed: 'Neindexate',
+      emptyNone: 'Niciun fișier încărcat',
+      emptyFiltered: 'Niciun fișier găsit cu filtrele selectate',
+      preview: 'Previzualizare',
+      reindex: 'Reindexare',
+      deleteConfirmTitle: 'Șterge fișierul?',
+      deleteConfirmDescription: 'Ești sigur că vrei să ștergi "{filename}"? Această acțiune nu poate fi anulată.',
+      statusIndexing: 'Se indexează',
+      statusReady: 'Indexat',
+      statusFailed: 'Eșuat',
+      statusNotIndexed: 'Neindexat',
+      uploadInvalidTitle: 'Format invalid',
+      uploadInvalidDescription: 'Doar fișiere PDF sunt acceptate.',
+      uploadErrorTitle: 'Eroare',
+      uploadErrorDescription: 'Nu s-a putut încărca {filename}',
+      loadErrorTitle: 'Nu am putut încărca fișierele',
+      loadErrorDescription: 'Verifică conexiunea și încearcă din nou.',
+      deleteSuccessTitle: 'Fișier șters',
+      deleteSuccessDescription: '{filename} a fost șters.',
+      deleteErrorDescription: 'Nu s-a putut șterge fișierul.',
+      indexNothingTitle: 'Nimic de indexat',
+      indexNothingDescription: 'Toate fișierele sunt deja indexate.',
+      indexCompleteTitle: 'Indexare completă',
+      indexCompleteDescription: '{indexed} fișiere indexate, {failed} eșuate.',
+      indexErrorDescription: 'Indexarea a eșuat.',
+      reindexCompleteTitle: 'Reindexare completă',
+      reindexCompleteDescription: '{filename} a fost reindexat.',
+      reindexErrorDescription: 'Reindexarea a eșuat.',
+    },
+
     // Conversations
     conversations: {
       title: 'Conversații',
@@ -458,6 +511,11 @@ const translations: Record<Language, Translations> = {
       helpful: 'Helpful response',
       notHelpful: 'Not helpful',
       feedbackThanks: 'Thanks for your feedback!',
+      userLabel: 'You',
+      assistantLabel: 'Assistant',
+      hintSend: 'to send',
+      hintNewLine: 'for a new line',
+      hintStop: 'to stop',
     },
     
     // Quick Suggestions
@@ -473,6 +531,7 @@ const translations: Record<Language, Translations> = {
       title: 'Sources & Citations',
       usePdfs: 'Search in PDFs',
       useMemory: 'Search in memory',
+      uploadPdf: 'Upload PDF',
       selectDocs: 'Select documents',
       allDocs: 'All documents',
       noSources: 'No sources',
@@ -521,6 +580,53 @@ const translations: Record<Language, Translations> = {
       invalidFile: 'Invalid file',
       fileTooLarge: 'File is too large',
       uploadError: 'Upload error',
+    },
+
+    // Files
+    files: {
+      title: 'PDF Files',
+      indexNew: 'Index new files',
+      deleteAll: 'Delete all files',
+      deleteAllTitle: 'Delete all files?',
+      deleteAllDescription: 'All PDF files and their index states will be removed. This action cannot be undone.',
+      deleteAllConfirm: 'Delete all',
+      deleteAllSuccessTitle: 'Files deleted',
+      deleteAllSuccessDescription: 'All files have been deleted.',
+      deleteAllErrorDescription: 'Could not delete all files.',
+      uploadTitle: 'Upload PDF files',
+      uploadDrop: 'Drop files here',
+      uploadHint: 'Drag & drop or click to select',
+      searchPlaceholder: 'Search files...',
+      filterAll: 'All',
+      filterIndexed: 'Indexed',
+      filterNotIndexed: 'Not indexed',
+      emptyNone: 'No files uploaded',
+      emptyFiltered: 'No files found for the selected filters',
+      preview: 'Preview',
+      reindex: 'Reindex',
+      deleteConfirmTitle: 'Delete file?',
+      deleteConfirmDescription: 'Are you sure you want to delete "{filename}"? This action cannot be undone.',
+      statusIndexing: 'Indexing',
+      statusReady: 'Indexed',
+      statusFailed: 'Failed',
+      statusNotIndexed: 'Not indexed',
+      uploadInvalidTitle: 'Invalid format',
+      uploadInvalidDescription: 'Only PDF files are accepted.',
+      uploadErrorTitle: 'Error',
+      uploadErrorDescription: 'Could not upload {filename}',
+      loadErrorTitle: 'Could not load files',
+      loadErrorDescription: 'Check your connection and try again.',
+      deleteSuccessTitle: 'File deleted',
+      deleteSuccessDescription: '{filename} was deleted.',
+      deleteErrorDescription: 'Could not delete the file.',
+      indexNothingTitle: 'Nothing to index',
+      indexNothingDescription: 'All files are already indexed.',
+      indexCompleteTitle: 'Indexing complete',
+      indexCompleteDescription: '{indexed} files indexed, {failed} failed.',
+      indexErrorDescription: 'Indexing failed.',
+      reindexCompleteTitle: 'Reindexing complete',
+      reindexCompleteDescription: '{filename} was reindexed.',
+      reindexErrorDescription: 'Reindexing failed.',
     },
     
     // Conversations
@@ -683,4 +789,13 @@ export function t(key: string, lang: Language = 'ro'): string {
 
 export function getTranslations(lang: Language): Translations {
   return translations[lang];
+}
+
+export function formatTranslation(
+  value: string,
+  params: Record<string, string | number>
+): string {
+  return value.replace(/\{(\w+)\}/g, (match, key) =>
+    Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : match
+  );
 }

@@ -1,10 +1,15 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useChatStore, useDocsStore } from '@/store/appStore';
+import { useChatStore } from '@/store/appStore';
+import { useFilesStore } from '@/store/filesStore';
+import { useAuthStore } from '@/store/authStore';
 import { validateMessage } from '@/lib/validation';
 import { VALIDATION } from '@/types';
+import { createFile, upsertIndexState } from '@/db/repo';
+import { filesApi } from '@/api/n8nClient';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import {
   Popover,
   PopoverContent,
@@ -21,7 +26,12 @@ import {
   FileText,
   Brain,
   ChevronDown,
+  Upload,
 } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { toast } from '@/hooks/use-toast';
+import { MaliciousPdfDialog } from '@/components/common/MaliciousPdfDialog';
+import { isPdfLikelyMalicious } from '@/lib/pdfSecurity';
 
 interface ChatComposerProps {
   onSend: (message: string) => void;
@@ -32,8 +42,10 @@ interface ChatComposerProps {
 export function ChatComposer({ onSend, disabled = false, showSuggestions = true }: ChatComposerProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
   const [validation, setValidation] = useState(validateMessage(''));
+  const [maliciousDialogOpen, setMaliciousDialogOpen] = useState(false);
   
   const { 
     isStreaming, 
@@ -45,9 +57,26 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
     messages,
   } = useChatStore();
   
-  const { docs } = useDocsStore();
-  const readyDocs = docs.filter(d => d.status === 'ready');
+  const { user } = useAuthStore();
+  const { workspaceId } = useParams<{ workspaceId?: string }>();
+  const {
+    files,
+    addFile,
+    updateIndexState,
+    setUploadProgress,
+    removeUploadProgress,
+    setIndexing,
+    uploadProgress,
+  } = useFilesStore();
+  const readyDocs = useMemo(
+    () => files.filter((file) => file.indexState?.status === 'ready'),
+    [files]
+  );
   const showQuickSuggestions = showSuggestions && messages.length === 0 && !message;
+  const uploadProgressList = useMemo(
+    () => Array.from(uploadProgress.values()),
+    [uploadProgress]
+  );
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -111,6 +140,173 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
         : [...selectedDocIds, docId]
     );
   };
+
+  const handleUploadFiles = useCallback(async (filesToUpload: File[]) => {
+    if (!workspaceId || !user) return;
+
+    for (const file of filesToUpload) {
+      const suspicious = await isPdfLikelyMalicious(file);
+      if (suspicious) {
+        setMaliciousDialogOpen(true);
+        continue;
+      }
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: t('files.uploadInvalidTitle'),
+          description: t('files.uploadInvalidDescription'),
+          variant: 'destructive',
+        });
+        continue;
+      }
+
+      if (file.size > VALIDATION.PDF_MAX_SIZE_BYTES) {
+        toast({
+          title: t('files.uploadErrorTitle'),
+          description: t('library.fileTooLarge'),
+          variant: 'destructive',
+        });
+        continue;
+      }
+
+      const tempId = `temp-${Date.now()}-${file.name}`;
+      setUploadProgress(tempId, {
+        docId: tempId,
+        filename: file.name,
+        progress: 0,
+        status: 'uploading',
+      });
+
+      try {
+        const dbFile = await createFile(workspaceId, file.name, file.size, file);
+        addFile({
+          ...dbFile,
+          indexState: {
+            docId: dbFile.docId,
+            workspaceId,
+            status: 'not_indexed',
+          },
+        });
+        setSourceSettings({ usePdfs: true });
+
+        let uploadSucceeded = false;
+        try {
+          await filesApi.upload(
+            workspaceId,
+            file,
+            {
+              userId: user.id,
+              username: user.username,
+              role: user.role,
+            },
+            (progress) => {
+              setUploadProgress(tempId, {
+                docId: dbFile.docId,
+                filename: file.name,
+                progress: Math.min(70, progress * 0.7),
+                status: 'uploading',
+              });
+            }
+          );
+          uploadSucceeded = true;
+        } catch {
+          toast({
+            title: t('files.uploadErrorTitle'),
+            description: t('files.uploadErrorDescription').replace('{filename}', file.name),
+            variant: 'destructive',
+          });
+        }
+
+        if (uploadSucceeded) {
+          setIndexing(dbFile.docId, true);
+          await upsertIndexState({
+            docId: dbFile.docId,
+            workspaceId,
+            status: 'indexing',
+            lastAttemptAt: Date.now(),
+          });
+          updateIndexState(dbFile.docId, { status: 'indexing' });
+
+          try {
+            const response = await filesApi.index(workspaceId, [dbFile.docId], {
+              userId: user.id,
+              username: user.username,
+              role: user.role,
+            });
+            if (response.success && response.data?.indexed?.includes(dbFile.docId)) {
+              await upsertIndexState({
+                docId: dbFile.docId,
+                workspaceId,
+                status: 'ready',
+                indexedAt: Date.now(),
+              });
+              updateIndexState(dbFile.docId, { status: 'ready', indexedAt: Date.now() });
+              const currentSelected = useChatStore.getState().selectedDocIds;
+              setSelectedDocIds(Array.from(new Set([...currentSelected, dbFile.docId])));
+            } else {
+              await upsertIndexState({
+                docId: dbFile.docId,
+                workspaceId,
+                status: 'failed',
+                lastError: 'Indexare eșuată',
+                lastAttemptAt: Date.now(),
+              });
+              updateIndexState(dbFile.docId, { status: 'failed' });
+            }
+          } catch {
+            await upsertIndexState({
+              docId: dbFile.docId,
+              workspaceId,
+              status: 'failed',
+              lastError: 'Indexare eșuată',
+              lastAttemptAt: Date.now(),
+            });
+            updateIndexState(dbFile.docId, { status: 'failed' });
+          } finally {
+            setIndexing(dbFile.docId, false);
+          }
+        }
+
+        setUploadProgress(tempId, {
+          docId: dbFile.docId,
+          filename: file.name,
+          progress: 100,
+          status: uploadSucceeded ? 'complete' : 'error',
+        });
+        setTimeout(() => removeUploadProgress(tempId), 1500);
+      } catch {
+        setUploadProgress(tempId, {
+          docId: tempId,
+          filename: file.name,
+          progress: 0,
+          status: 'error',
+        });
+        toast({
+          title: t('files.uploadErrorTitle'),
+          description: t('files.uploadErrorDescription').replace('{filename}', file.name),
+          variant: 'destructive',
+        });
+      }
+    }
+  }, [
+    workspaceId,
+    user,
+    setUploadProgress,
+    addFile,
+    setSourceSettings,
+    setSelectedDocIds,
+    updateIndexState,
+    setIndexing,
+    removeUploadProgress,
+    t,
+  ]);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const filesToUpload = Array.from(e.target.files || []);
+    if (filesToUpload.length > 0) {
+      await handleUploadFiles(filesToUpload);
+    }
+    e.target.value = '';
+  }, [handleUploadFiles]);
 
   return (
     <div className="border-t bg-background">
@@ -181,11 +377,11 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
                   <div className="space-y-1">
                     {readyDocs.map((doc) => (
                       <div
-                        key={doc.id}
+                        key={doc.docId}
                         className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer transition-colors"
-                        onClick={() => toggleDocSelection(doc.id)}
+                        onClick={() => toggleDocSelection(doc.docId)}
                       >
-                        <Checkbox checked={selectedDocIds.includes(doc.id)} />
+                        <Checkbox checked={selectedDocIds.includes(doc.docId)} />
                         <span className="text-sm truncate">{doc.filename}</span>
                       </div>
                     ))}
@@ -194,7 +390,40 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
               </PopoverContent>
             </Popover>
           )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            multiple
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || !workspaceId || !user}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {t('sources.uploadPdf')}
+          </Button>
         </div>
+
+        {uploadProgressList.length > 0 && (
+          <div className="mb-4 space-y-2">
+            {uploadProgressList.map((progress) => (
+              <div key={progress.docId} className="space-y-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="truncate">{progress.filename}</span>
+                  <span>{Math.round(progress.progress)}%</span>
+                </div>
+                <Progress value={progress.progress} className="h-1" />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Input area */}
         <div className="relative flex items-end gap-2">
@@ -245,13 +474,22 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
 
         {/* Keyboard hint */}
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> pentru trimitere • 
-          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono ml-1">Shift+Enter</kbd> pentru linie nouă
+          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd> {t('chat.hintSend')}
+          <span className="mx-1">/</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">Shift+Enter</kbd> {t('chat.hintNewLine')}
           {isStreaming && (
-            <> • <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">Esc</kbd> pentru oprire</>
+            <>
+              <span className="mx-1">/</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">Esc</kbd> {t('chat.hintStop')}
+            </>
           )}
         </p>
       </div>
+
+      <MaliciousPdfDialog
+        open={maliciousDialogOpen}
+        onClose={() => setMaliciousDialogOpen(false)}
+      />
     </div>
   );
 }

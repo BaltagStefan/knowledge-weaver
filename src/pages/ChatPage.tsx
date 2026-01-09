@@ -1,8 +1,9 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useChatStore, useUIStore, useConversationsStore, useProjectsStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useFilesStore } from '@/store/filesStore';
 import { streamChat } from '@/api';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
@@ -16,6 +17,8 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { MessageSquarePlus, PanelRightOpen, PanelRightClose, Sparkles } from 'lucide-react';
 import type { Message } from '@/types';
+import { getFilesWithIndexState } from '@/db/repo';
+import { useParams } from 'react-router-dom';
 
 export default function ChatPage() {
   const { t } = useTranslation();
@@ -46,12 +49,36 @@ export default function ChatPage() {
   const { addConversation, getConversationsForUser, updateConversation } = useConversationsStore();
   const { user } = useAuthStore();
   const { workspaces, currentWorkspaceId } = useWorkspaceStore();
+  const { setFiles } = useFilesStore();
+  const { workspaceId } = useParams<{ workspaceId?: string }>();
+  const effectiveWorkspaceId = workspaceId || currentWorkspaceId || null;
 
   const userProjects = user ? getProjectsForUser(user.id) : [];
   
   // Check if user has any workspaces assigned
   const hasWorkspace = user?.workspaceIds && user.workspaceIds.length > 0;
   const currentProject = userProjects.find(p => p.id === currentProjectId);
+
+  useEffect(() => {
+    if (!effectiveWorkspaceId) return;
+    let cancelled = false;
+
+    const loadFiles = async () => {
+      try {
+        const localFiles = await getFilesWithIndexState(effectiveWorkspaceId);
+        if (!cancelled) {
+          setFiles(localFiles);
+        }
+      } catch (error) {
+        console.warn('Failed to load files for chat:', error);
+      }
+    };
+
+    loadFiles();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveWorkspaceId, setFiles]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -199,6 +226,24 @@ export default function ChatPage() {
   }, [messages, handleSend]);
 
   const showEmptyState = messages.length === 0 && !isStreaming;
+  const lastAssistantMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === 'assistant') return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
+  const renderedMessages = useMemo(
+    () =>
+      messages.map((msg) => (
+        <ChatMessage
+          key={msg.id}
+          message={msg}
+          onRegenerate={msg.id === lastAssistantMessageId ? handleRegenerate : undefined}
+        />
+      )),
+    [messages, lastAssistantMessageId, handleRegenerate]
+  );
 
   // If user has no workspace, show the no-workspace message
   if (!hasWorkspace) {
@@ -207,7 +252,7 @@ export default function ChatPage() {
         <header className="flex items-center justify-between h-14 px-6 border-b bg-white dark:bg-background shrink-0">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h1 className="font-medium text-foreground">Chat</h1>
+            <h1 className="font-medium text-foreground">{t('nav.chat')}</h1>
           </div>
         </header>
         <NoWorkspaceMessage />
@@ -265,13 +310,7 @@ export default function ChatPage() {
           </div>
         ) : (
           <div>
-            {messages.map((msg, index) => (
-              <ChatMessage 
-                key={msg.id} 
-                message={msg}
-                onRegenerate={msg.role === 'assistant' && index === messages.length - 1 ? handleRegenerate : undefined}
-              />
-            ))}
+            {renderedMessages}
             
             {isTyping && !streamingText && (
               <TypingIndicator />

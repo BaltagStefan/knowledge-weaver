@@ -22,10 +22,7 @@ import {
 } from '@/components/ui/select';
 import { useFilesStore, type FileWithIndex } from '@/store/filesStore';
 import { cn } from '@/lib/utils';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import { getPdfjs } from '@/lib/pdfjs';
 
 interface PDFSelectionModalProps {
   open: boolean;
@@ -40,6 +37,7 @@ export function PDFSelectionModal({
   onConfirm,
   initialSelection = [],
 }: PDFSelectionModalProps) {
+  const pdfjsLib = getPdfjs();
   const { files, getIndexedFiles, isLoading } = useFilesStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'indexed' | 'not_indexed'>('indexed');

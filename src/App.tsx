@@ -6,7 +6,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAppInit } from "@/hooks/useAppInit";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import ChatPage from "./pages/ChatPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import FilesPage from "./pages/FilesPage";
@@ -118,12 +121,29 @@ function AppContent() {
   );
 }
 
+function ErrorFallback() {
+  const { t } = useTranslation();
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 text-center">
+      <div className="max-w-md space-y-4">
+        <h1 className="text-2xl font-semibold">{t('errors.generic')}</h1>
+        <p className="text-muted-foreground">{t('errors.network')}</p>
+        <Button onClick={() => window.location.reload()}>
+          {t('common.retry')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AppContent />
+      <ErrorBoundary fallback={<ErrorFallback />}>
+        <AppContent />
+      </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );

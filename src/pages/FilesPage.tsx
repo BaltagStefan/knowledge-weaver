@@ -24,17 +24,26 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFilesStore, type FileWithIndex } from '@/store/filesStore';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { formatTranslation } from '@/lib/i18n';
 import { createFile, upsertIndexState, deleteFile as deleteFileFromDB, getFilesWithIndexState } from '@/db/repo';
 import { filesApi } from '@/api/n8nClient';
 import { PDFPreviewModal } from '@/components/files/PDFPreviewModal';
+import { MaliciousPdfDialog } from '@/components/common/MaliciousPdfDialog';
+import { isPdfLikelyMalicious } from '@/lib/pdfSecurity';
 
 export default function FilesPage() {
   const { t } = useTranslation();
+  const format = useCallback(
+    (key: string, params: Record<string, string | number>) =>
+      formatTranslation(t(key), params),
+    [t]
+  );
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user } = useAuthStore();
   const {
@@ -56,12 +65,17 @@ export default function FilesPage() {
     uploadProgress,
     setUploadProgress,
     removeUploadProgress,
+    clearUploadProgress,
   } = useFilesStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<FileWithIndex | null>(null);
   const [previewFile, setPreviewFile] = useState<FileWithIndex | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [maliciousDialogOpen, setMaliciousDialogOpen] = useState(false);
 
   // Load files on mount
   useEffect(() => {
@@ -74,6 +88,7 @@ export default function FilesPage() {
     if (!workspaceId) return;
     
     setLoading(true);
+    setLoadError(false);
     try {
       // Load from local DB first
       const localFiles = await getFilesWithIndexState(workspaceId);
@@ -93,6 +108,12 @@ export default function FilesPage() {
       }
     } catch (error) {
       console.error('Failed to load files:', error);
+      setLoadError(true);
+      toast({
+        title: t('files.loadErrorTitle'),
+        description: t('files.loadErrorDescription'),
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -118,8 +139,8 @@ export default function FilesPage() {
 
     if (droppedFiles.length === 0) {
       toast({
-        title: 'Format invalid',
-        description: 'Doar fișiere PDF sunt acceptate.',
+        title: t('files.uploadInvalidTitle'),
+        description: t('files.uploadInvalidDescription'),
         variant: 'destructive',
       });
       return;
@@ -145,6 +166,11 @@ export default function FilesPage() {
     if (!workspaceId || !user) return;
 
     for (const file of filesToUpload) {
+      const suspicious = await isPdfLikelyMalicious(file);
+      if (suspicious) {
+        setMaliciousDialogOpen(true);
+        continue;
+      }
       const tempId = `temp-${Date.now()}-${file.name}`;
       
       setUploadProgress(tempId, {
@@ -218,12 +244,12 @@ export default function FilesPage() {
           filename: file.name,
           progress: 0,
           status: 'error',
-          errorMessage: 'Eroare la încărcare',
+          errorMessage: t('files.uploadErrorTitle'),
         });
 
         toast({
-          title: 'Eroare',
-          description: `Nu s-a putut încărca ${file.name}`,
+          title: t('files.uploadErrorTitle'),
+          description: format('files.uploadErrorDescription', { filename: file.name }),
           variant: 'destructive',
         });
       }
@@ -252,18 +278,58 @@ export default function FilesPage() {
       }
 
       toast({
-        title: 'Fișier șters',
-        description: `${fileToDelete.filename} a fost șters.`,
+        title: t('files.deleteSuccessTitle'),
+        description: format('files.deleteSuccessDescription', { filename: fileToDelete.filename }),
       });
     } catch (error) {
       toast({
-        title: 'Eroare',
-        description: 'Nu s-a putut șterge fișierul.',
+        title: t('common.error'),
+        description: t('files.deleteErrorDescription'),
         variant: 'destructive',
       });
     } finally {
       setDeleteDialogOpen(false);
       setFileToDelete(null);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!workspaceId || !user || files.length === 0) return;
+    setIsDeletingAll(true);
+    const docIds = files.map((file) => file.docId);
+
+    try {
+      for (const docId of docIds) {
+        await deleteFileFromDB(docId);
+        removeFile(docId);
+      }
+      clearUploadProgress();
+
+      for (const docId of docIds) {
+        try {
+          await filesApi.delete(workspaceId, docId, {
+            userId: user.id,
+            username: user.username,
+            role: user.role,
+          });
+        } catch (serverError) {
+          console.warn('Server delete failed:', serverError);
+        }
+      }
+
+      toast({
+        title: t('files.deleteAllSuccessTitle'),
+        description: t('files.deleteAllSuccessDescription'),
+      });
+    } catch (error) {
+      toast({
+        title: t('common.error'),
+        description: t('files.deleteAllErrorDescription'),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingAll(false);
+      setDeleteAllDialogOpen(false);
     }
   };
 
@@ -276,8 +342,8 @@ export default function FilesPage() {
 
     if (notIndexed.length === 0) {
       toast({
-        title: 'Nimic de indexat',
-        description: 'Toate fișierele sunt deja indexate.',
+        title: t('files.indexNothingTitle'),
+        description: t('files.indexNothingDescription'),
       });
       return;
     }
@@ -328,8 +394,11 @@ export default function FilesPage() {
         }
 
         toast({
-          title: 'Indexare completă',
-          description: `${response.data.indexed.length} fișiere indexate, ${response.data.failed.length} eșuate.`,
+          title: t('files.indexCompleteTitle'),
+          description: format('files.indexCompleteDescription', {
+            indexed: response.data.indexed.length,
+            failed: response.data.failed.length,
+          }),
         });
       }
     } catch (error) {
@@ -346,8 +415,8 @@ export default function FilesPage() {
       }
 
       toast({
-        title: 'Eroare',
-        description: 'Indexarea a eșuat.',
+        title: t('common.error'),
+        description: t('files.indexErrorDescription'),
         variant: 'destructive',
       });
     } finally {
@@ -377,8 +446,8 @@ export default function FilesPage() {
       updateIndexState(file.docId, { status: 'ready', indexedAt: Date.now() });
 
       toast({
-        title: 'Reindexare completă',
-        description: `${file.filename} a fost reindexat.`,
+        title: t('files.reindexCompleteTitle'),
+        description: format('files.reindexCompleteDescription', { filename: file.filename }),
       });
     } catch (error) {
       await upsertIndexState({
@@ -391,8 +460,8 @@ export default function FilesPage() {
       updateIndexState(file.docId, { status: 'failed' });
 
       toast({
-        title: 'Eroare',
-        description: 'Reindexarea a eșuat.',
+        title: t('common.error'),
+        description: t('files.reindexErrorDescription'),
         variant: 'destructive',
       });
     } finally {
@@ -408,7 +477,7 @@ export default function FilesPage() {
       return (
         <Badge variant="secondary" className="gap-1">
           <Loader2 className="h-3 w-3 animate-spin" />
-          Se indexează
+          {t('files.statusIndexing')}
         </Badge>
       );
     }
@@ -418,28 +487,28 @@ export default function FilesPage() {
         return (
           <Badge variant="default" className="gap-1 bg-green-600">
             <CheckCircle className="h-3 w-3" />
-            Indexat
+            {t('files.statusReady')}
           </Badge>
         );
       case 'indexing':
         return (
           <Badge variant="secondary" className="gap-1">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Se indexează
+            {t('files.statusIndexing')}
           </Badge>
         );
       case 'failed':
         return (
           <Badge variant="destructive" className="gap-1">
             <XCircle className="h-3 w-3" />
-            Eșuat
+            {t('files.statusFailed')}
           </Badge>
         );
       default:
         return (
           <Badge variant="outline" className="gap-1">
             <Clock className="h-3 w-3" />
-            Neindexat
+            {t('files.statusNotIndexed')}
           </Badge>
         );
     }
@@ -452,11 +521,21 @@ export default function FilesPage() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <header className="flex items-center justify-between h-14 px-4 border-b bg-background/95 backdrop-blur shrink-0">
-        <h1 className="font-semibold">Fișiere PDF</h1>
-        <Button onClick={handleIndexNew} disabled={isLoading}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Indexează fișiere noi
-        </Button>
+        <h1 className="font-semibold">{t('files.title')}</h1>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleIndexNew} disabled={isLoading || isDeletingAll}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {t('files.indexNew')}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setDeleteAllDialogOpen(true)}
+            disabled={isLoading || isDeletingAll || files.length === 0}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            {t('files.deleteAll')}
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 p-6 overflow-hidden">
@@ -484,10 +563,10 @@ export default function FilesPage() {
             />
             <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
             <h3 className="font-medium mb-1">
-              {isDragging ? 'Plasează fișierele aici' : 'Încarcă fișiere PDF'}
+              {isDragging ? t('files.uploadDrop') : t('files.uploadTitle')}
             </h3>
             <p className="text-sm text-muted-foreground">
-              Drag & drop sau click pentru a selecta
+              {t('files.uploadHint')}
             </p>
           </div>
 
@@ -520,7 +599,7 @@ export default function FilesPage() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Caută fișiere..."
+                placeholder={t('files.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -532,12 +611,24 @@ export default function FilesPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toate</SelectItem>
-                <SelectItem value="indexed">Indexate</SelectItem>
-                <SelectItem value="not_indexed">Neindexate</SelectItem>
+                <SelectItem value="all">{t('files.filterAll')}</SelectItem>
+                <SelectItem value="indexed">{t('files.filterIndexed')}</SelectItem>
+                <SelectItem value="not_indexed">{t('files.filterNotIndexed')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {loadError && (
+            <Alert variant="destructive">
+              <AlertTitle>{t('files.loadErrorTitle')}</AlertTitle>
+              <AlertDescription className="flex items-center justify-between gap-4">
+                <span>{t('files.loadErrorDescription')}</span>
+                <Button variant="outline" size="sm" onClick={loadFiles}>
+                  {t('common.retry')}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Files List */}
           <ScrollArea className="flex-1">
@@ -549,9 +640,7 @@ export default function FilesPage() {
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <FileText className="h-12 w-12 text-muted-foreground/50 mb-3" />
                 <p className="text-muted-foreground">
-                  {files.length === 0
-                    ? 'Niciun fișier încărcat'
-                    : 'Niciun fișier găsit cu filtrele selectate'}
+                  {files.length === 0 ? t('files.emptyNone') : t('files.emptyFiltered')}
                 </p>
               </div>
             ) : (
@@ -585,7 +674,7 @@ export default function FilesPage() {
                           onClick={() => setPreviewFile(file)}
                         >
                           <Eye className="h-4 w-4 mr-1" />
-                          Previzualizare
+                          {t('files.preview')}
                         </Button>
                         <Button
                           variant="ghost"
@@ -597,7 +686,7 @@ export default function FilesPage() {
                             'h-4 w-4 mr-1',
                             indexingDocIds.has(file.docId) && 'animate-spin'
                           )} />
-                          Reindexare
+                          {t('files.reindex')}
                         </Button>
                         <Button
                           variant="ghost"
@@ -624,19 +713,42 @@ export default function FilesPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Șterge fișierul?</AlertDialogTitle>
+            <AlertDialogTitle>{t('files.deleteConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Ești sigur că vrei să ștergi „{fileToDelete?.filename}"? Această acțiune
-              nu poate fi anulată.
+              {format('files.deleteConfirmDescription', {
+                filename: fileToDelete?.filename ?? '',
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Anulează</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Șterge
+              {t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Confirmation */}
+      <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('files.deleteAllTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('files.deleteAllDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingAll}
+            >
+              {isDeletingAll ? t('common.loading') : t('files.deleteAllConfirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -649,6 +761,11 @@ export default function FilesPage() {
           onClose={() => setPreviewFile(null)}
         />
       )}
+
+      <MaliciousPdfDialog
+        open={maliciousDialogOpen}
+        onClose={() => setMaliciousDialogOpen(false)}
+      />
     </div>
   );
 }

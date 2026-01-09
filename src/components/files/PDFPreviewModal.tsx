@@ -9,10 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { FileWithIndex } from '@/store/filesStore';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import { getPdfjs } from '@/lib/pdfjs';
 
 interface PDFPreviewModalProps {
   file: FileWithIndex;
@@ -20,6 +17,7 @@ interface PDFPreviewModalProps {
 }
 
 export function PDFPreviewModal({ file, onClose }: PDFPreviewModalProps) {
+  const pdfjsLib = getPdfjs();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -27,19 +25,23 @@ export function PDFPreviewModal({ file, onClose }: PDFPreviewModalProps) {
   const [scale, setScale] = useState(1.2);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null);
 
   useEffect(() => {
+    setCurrentPage(1);
+    setScale(1.2);
     loadPDF();
     return () => {
+      renderTaskRef.current?.cancel();
       pdfDocRef.current?.destroy();
     };
   }, [file]);
 
   useEffect(() => {
-    if (pdfDocRef.current) {
+    if (!isLoading && pdfDocRef.current) {
       renderPage(currentPage);
     }
-  }, [currentPage, scale]);
+  }, [isLoading, currentPage, scale]);
 
   const loadPDF = async () => {
     setIsLoading(true);
@@ -60,7 +62,6 @@ export function PDFPreviewModal({ file, onClose }: PDFPreviewModalProps) {
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       pdfDocRef.current = pdf;
       setTotalPages(pdf.numPages);
-      await renderPage(1);
     } catch (err) {
       console.error('Failed to load PDF:', err);
       setError(err instanceof Error ? err.message : 'Nu s-a putut încărca PDF-ul');
@@ -80,15 +81,26 @@ export function PDFPreviewModal({ file, onClose }: PDFPreviewModalProps) {
 
       if (!context) return;
 
+      renderTaskRef.current?.cancel();
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
-      await page.render({
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      renderTaskRef.current = page.render({
         canvasContext: context,
         viewport,
-      }).promise;
+        background: '#ffffff',
+      });
+      await renderTaskRef.current.promise;
     } catch (err) {
+      if (err instanceof Error && err.name === 'RenderingCancelledException') {
+        return;
+      }
       console.error('Failed to render page:', err);
+      setError(err instanceof Error ? err.message : 'Nu s-a putut afișa pagina');
     }
   };
 

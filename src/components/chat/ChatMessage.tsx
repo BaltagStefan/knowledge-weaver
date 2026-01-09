@@ -88,7 +88,7 @@ export const ChatMessage = memo(function ChatMessage({
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-foreground">
-              {isUser ? 'Tu' : 'Kotaemon'}
+              {isUser ? t('chat.userLabel') : t('chat.assistantLabel')}
             </p>
             
             {/* Message Actions */}
@@ -130,7 +130,7 @@ export const ChatMessage = memo(function ChatMessage({
                 <SafeMarkdown content={message.content} />
                 {isStreaming && (
                   <span className="inline-flex ml-1">
-                    <span className="animate-pulse text-primary">▊</span>
+                    <span className="animate-pulse text-primary">|</span>
                   </span>
                 )}
               </>

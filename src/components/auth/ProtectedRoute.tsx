@@ -3,6 +3,7 @@ import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { canAccessRoute } from '@/types/auth';
+import { canAccessWorkspace, isUserPlus } from '@/lib/permissions';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -45,16 +46,13 @@ export function ProtectedRoute({
   }
 
   // Check user+ or admin role
-  if (requireUserPlus && user?.role === 'user') {
+  if (requireUserPlus && !isUserPlus(user)) {
     return <Navigate to="/" replace />;
   }
 
   // Check workspace access
-  if (requireWorkspace && workspaceId) {
-    const hasAccess = user?.workspaceIds.includes(workspaceId) || user?.role === 'admin';
-    if (!hasAccess) {
-      return <Navigate to="/" replace />;
-    }
+  if (requireWorkspace && !canAccessWorkspace(user, workspaceId)) {
+    return <Navigate to="/" replace />;
   }
 
   // Check route permissions
