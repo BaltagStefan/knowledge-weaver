@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CodeBlock, CodeWithConfig } from '@/components/docs/CodeBlock';
+import { apiEndpoints, components, databaseTables, stores } from './docs/data';
+import { useTranslation } from '@/hooks/useTranslation';
 import { 
   Database, 
   Server, 
@@ -32,6 +34,7 @@ import {
 } from 'lucide-react';
 
 export default function DocsPage() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4 max-w-7xl">
@@ -53,16 +56,16 @@ export default function DocsPage() {
           <TabsList className="flex flex-wrap h-auto gap-2">
             <TabsTrigger value="migration" className="flex items-center gap-1">
               <GitCompare className="h-3.5 w-3.5" />
-              Migrare
+              {t('docs.tabs.migration')}
             </TabsTrigger>
-            <TabsTrigger value="overview">Prezentare</TabsTrigger>
-            <TabsTrigger value="setup">Setup & Config</TabsTrigger>
-            <TabsTrigger value="n8n">n8n Workflows</TabsTrigger>
-            <TabsTrigger value="keycloak">Keycloak</TabsTrigger>
-            <TabsTrigger value="database">Bază de Date</TabsTrigger>
-            <TabsTrigger value="api">API Reference</TabsTrigger>
-            <TabsTrigger value="stores">State Management</TabsTrigger>
-            <TabsTrigger value="components">Componente</TabsTrigger>
+            <TabsTrigger value="overview">{t('docs.tabs.overview')}</TabsTrigger>
+            <TabsTrigger value="setup">{t('docs.tabs.setup')}</TabsTrigger>
+            <TabsTrigger value="n8n">{t('docs.tabs.n8n')}</TabsTrigger>
+            <TabsTrigger value="keycloak">{t('docs.tabs.keycloak')}</TabsTrigger>
+            <TabsTrigger value="database">{t('docs.tabs.database')}</TabsTrigger>
+            <TabsTrigger value="api">{t('docs.tabs.api')}</TabsTrigger>
+            <TabsTrigger value="stores">{t('docs.tabs.stores')}</TabsTrigger>
+            <TabsTrigger value="components">{t('docs.tabs.components')}</TabsTrigger>
           </TabsList>
 
           {/* Migration Tab - Default */}
