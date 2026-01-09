@@ -387,6 +387,21 @@ const translations: Record<Language, Translations> = {
       expandSection: 'Extinde secțiunea',
       collapseSection: 'Restrânge secțiunea',
     },
+
+    // Docs
+    docs: {
+      tabs: {
+        migration: 'Migrare',
+        overview: 'Prezentare',
+        setup: 'Setup & Config',
+        n8n: 'n8n Workflows',
+        keycloak: 'Keycloak',
+        database: 'Bază de Date',
+        api: 'API Reference',
+        stores: 'State Management',
+        components: 'Componente',
+      },
+    },
   },
   
   en: {
@@ -765,6 +780,21 @@ const translations: Record<Language, Translations> = {
       closeModal: 'Close modal',
       expandSection: 'Expand section',
       collapseSection: 'Collapse section',
+    },
+
+    // Docs
+    docs: {
+      tabs: {
+        migration: 'Migration',
+        overview: 'Overview',
+        setup: 'Setup & Config',
+        n8n: 'n8n Workflows',
+        keycloak: 'Keycloak',
+        database: 'Database',
+        api: 'API Reference',
+        stores: 'State Management',
+        components: 'Components',
+      },
     },
   },
 };
