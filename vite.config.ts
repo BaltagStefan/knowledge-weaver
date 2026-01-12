@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => ({
         target: "http://gpt-oss-120b.kubeflow-dcpd.kubeflow.int.stscloud.ro/v1",
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api\/llm/, ""),
+        rewrite: (path) => path.replace(/^\/api\/llm(\/v1)?/, ""),
         configure: (proxy) => {
           proxy.on("error", (err) => {
             console.log("LLM proxy error:", err);
@@ -28,21 +28,21 @@ export default defineConfig(({ mode }) => ({
         target: "http://gpt-oss-120b.kubeflow-dcpd.kubeflow.int.stscloud.ro/v1",
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api\/vectordb/, "")
+        rewrite: (path) => path.replace(/^\/api\/vectordb(\/v1)?/, "")
       },
       // Embedding API proxy
       "/api/embed": {
         target: "http://gpt-oss-120b.kubeflow-dcpd.kubeflow.int.stscloud.ro/v1",
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api\/embed/, "")
+        rewrite: (path) => path.replace(/^\/api\/embed(\/v1)?/, "")
       },
       // Generic API proxy for other services
       "/api": {
         target: "http://gpt-oss-120b.kubeflow-dcpd.kubeflow.int.stscloud.ro/v1",
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, "")
+        rewrite: (path) => path.replace(/^\/api(\/v1)?/, "")
       }
     }
   },
