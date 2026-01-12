@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => ({
           });
         }
       },
+      "/api/chat": {
+        target: "http://gpt-oss-120b.kubeflow-dcpd.kubeflow.int.stscloud.ro/v1",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/chat(\/v1)?/, "")
+      },
       // Vector DB proxy (configure with your vector DB URL)
       "/api/vectordb": {
         target: "http://gpt-oss-120b.kubeflow-dcpd.kubeflow.int.stscloud.ro/v1",

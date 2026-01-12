@@ -148,6 +148,8 @@ export interface ModelSettings {
   name?: string;
   temperature?: number;
   maxTokens?: number;
+  endpoint?: string;
+  apiKey?: string;
 }
 
 export interface ChatStreamRequest {

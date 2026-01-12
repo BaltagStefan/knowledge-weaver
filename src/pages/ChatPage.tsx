@@ -16,8 +16,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { MessageSquarePlus, PanelRightOpen, PanelRightClose, Sparkles } from 'lucide-react';
-import type { Message } from '@/types';
-import { getFilesWithIndexState } from '@/db/repo';
+import type { Message, ModelSettings } from '@/types';
+import { getFilesWithIndexState, getWorkspaceSettings } from '@/db/repo';
 import { useParams } from 'react-router-dom';
 
 export default function ChatPage() {
@@ -52,6 +52,7 @@ export default function ChatPage() {
   const { setFiles } = useFilesStore();
   const { workspaceId } = useParams<{ workspaceId?: string }>();
   const effectiveWorkspaceId = workspaceId || currentWorkspaceId || null;
+  const [llmModel, setLlmModel] = useState<ModelSettings | null>(null);
 
   const userProjects = user ? getProjectsForUser(user.id) : [];
   
@@ -79,6 +80,48 @@ export default function ChatPage() {
       cancelled = true;
     };
   }, [effectiveWorkspaceId, setFiles]);
+
+  useEffect(() => {
+    if (!effectiveWorkspaceId) {
+      setLlmModel(null);
+      return;
+    }
+    let cancelled = false;
+
+    const loadModelSettings = async () => {
+      try {
+        const settings = await getWorkspaceSettings(effectiveWorkspaceId);
+        const modelSettings = settings?.modelSettings;
+        if (!modelSettings) {
+          if (!cancelled) setLlmModel(null);
+          return;
+        }
+        const selectedId = modelSettings.selectedLlmId || modelSettings.llmEndpoints[0]?.id;
+        const selectedEndpoint = modelSettings.llmEndpoints.find((endpoint) => endpoint.id === selectedId);
+        const endpoint = selectedEndpoint?.endpoint?.trim();
+
+        if (!cancelled && endpoint) {
+          setLlmModel({
+            endpoint,
+            apiKey: selectedEndpoint?.apiKey,
+            name: selectedEndpoint?.name,
+            temperature: selectedEndpoint?.temperature,
+            maxTokens: selectedEndpoint?.maxTokens,
+          });
+        } else if (!cancelled) {
+          setLlmModel(null);
+        }
+      } catch (error) {
+        console.warn('Failed to load model settings for chat:', error);
+        if (!cancelled) setLlmModel(null);
+      }
+    };
+
+    loadModelSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveWorkspaceId]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -154,6 +197,7 @@ export default function ChatPage() {
           docIds: selectedDocIds.length > 0 ? selectedDocIds : undefined,
         },
         rag: ragSettings,
+        model: llmModel?.endpoint ? llmModel : undefined,
       },
       {
         onToken: (text) => {
@@ -214,7 +258,7 @@ export default function ChatPage() {
   }, [
     currentConversationId, currentProjectId, sourceSettings, selectedDocIds, ragSettings,
     addMessage, addConversation, setCurrentConversation, startStreaming, setStreamingStatus, 
-    appendStreamingText, stopStreaming, setCitations, scrollToBottom, t
+    appendStreamingText, stopStreaming, setCitations, scrollToBottom, t, llmModel
   ]);
 
   const handleRegenerate = useCallback(() => {

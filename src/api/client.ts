@@ -22,6 +22,7 @@ import type {
   MemoryEntryUpdate,
   ApiError,
 } from '@/types';
+import { getProxyUrl, normalizeLlmEndpoint } from '@/lib/llm';
 
 // ============================================
 // Configuration
@@ -31,7 +32,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Function to determine which proxy to use based on endpoint
 function getApiBaseUrl(endpoint: string): string {
-  if (endpoint.startsWith('/chat/') || endpoint.startsWith('/llm/')) {
+  if (endpoint.startsWith('/chat/')) {
+    return '/api/chat';
+  }
+  if (endpoint.startsWith('/llm/')) {
     return '/api/llm';
   }
   if (endpoint.startsWith('/embed/')) {
@@ -338,11 +342,199 @@ export interface ChatStreamCallbacks {
   onError: (error: ApiException) => void;
 }
 
+const getStreamMessageId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `msg-${Date.now()}`;
+};
+
+const extractChatContent = (data: unknown): string => {
+  if (!data || typeof data !== 'object') return '';
+  const record = data as Record<string, unknown>;
+  const choices = record.choices;
+  if (Array.isArray(choices) && choices.length > 0) {
+    const choice = choices[0] as Record<string, unknown>;
+    const message = choice.message as Record<string, unknown> | undefined;
+    if (message?.content && typeof message.content === 'string') {
+      return message.content;
+    }
+    if (typeof choice.text === 'string') {
+      return choice.text;
+    }
+  }
+  return '';
+};
+
+async function streamChatViaLlm(
+  request: ChatStreamRequest,
+  callbacks: ChatStreamCallbacks,
+  abortController: AbortController
+): Promise<void> {
+  const endpoint = request.model?.endpoint;
+  if (!endpoint) {
+    callbacks.onError(new ApiException({
+      message: 'LLM endpoint is not configured',
+      code: 'LLM_ENDPOINT_MISSING',
+      status: 400,
+    }));
+    return;
+  }
+
+  const requestUrl = getProxyUrl(normalizeLlmEndpoint(endpoint), '/api/llm');
+  const messages = [];
+  if (request.systemPromptOverride) {
+    messages.push({ role: 'system', content: request.systemPromptOverride });
+  }
+  messages.push({ role: 'user', content: request.message });
+
+  const payload: Record<string, unknown> = {
+    model: request.model?.name || 'test',
+    messages,
+    stream: true,
+  };
+
+  if (request.model?.temperature !== undefined) {
+    payload.temperature = request.model.temperature;
+  }
+  if (request.model?.maxTokens !== undefined) {
+    payload.max_tokens = request.model.maxTokens;
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  };
+
+  if (request.model?.apiKey) {
+    headers.Authorization = `Bearer ${request.model.apiKey}`;
+  }
+
+  callbacks.onStatus('generating');
+
+  try {
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: abortController.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new ApiException({
+        message: errorText || getDefaultErrorMessage(response.status),
+        code: `HTTP_${response.status}`,
+        status: response.status,
+      });
+    }
+
+    const messageId = getStreamMessageId();
+    const contentType = response.headers.get('Content-Type') || '';
+    if (!contentType.includes('text/event-stream')) {
+      const data = await response.json().catch(() => null);
+      const text = extractChatContent(data);
+      if (text) {
+        callbacks.onToken(text);
+      }
+      callbacks.onDone(messageId, text);
+      return;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new ApiException({
+        message: 'No response body',
+        code: 'NO_BODY',
+        status: 500,
+      });
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalText = '';
+    let streamDone = false;
+
+    const processLine = (line: string) => {
+      if (!line.startsWith('data:')) return;
+      const data = line.slice(5).trim();
+      if (!data) return;
+      if (data === '[DONE]') {
+        streamDone = true;
+        return;
+      }
+
+      try {
+        const event = JSON.parse(data) as Record<string, unknown>;
+        const choices = event.choices;
+        if (!Array.isArray(choices) || choices.length === 0) return;
+        const choice = choices[0] as Record<string, unknown>;
+        const delta = choice.delta as Record<string, unknown> | undefined;
+        const token =
+          (delta?.content && typeof delta.content === 'string' ? delta.content : '') ||
+          (choice.message && typeof choice.message === 'object'
+            ? ((choice.message as Record<string, unknown>).content as string) || ''
+            : '') ||
+          (typeof choice.text === 'string' ? choice.text : '');
+
+        if (token) {
+          finalText += token;
+          callbacks.onToken(token);
+        }
+      } catch (e) {
+        debugLog('Failed to parse LLM stream chunk:', e);
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        processLine(line.trim());
+        if (streamDone) break;
+      }
+
+      if (streamDone) break;
+    }
+
+    if (!streamDone && buffer.trim()) {
+      processLine(buffer.trim());
+    }
+
+    callbacks.onDone(messageId, finalText);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      debugLog('Stream aborted by user');
+      return;
+    }
+
+    if (error instanceof ApiException) {
+      callbacks.onError(error);
+    } else {
+      callbacks.onError(new ApiException({
+        message: error instanceof Error ? error.message : 'Network error',
+        code: 'NETWORK_ERROR',
+        status: 0,
+      }));
+    }
+  }
+}
+
 export function streamChat(
   request: ChatStreamRequest,
   callbacks: ChatStreamCallbacks,
   abortController: AbortController
 ): void {
+  if (request.model?.endpoint) {
+    void streamChatViaLlm(request, callbacks, abortController);
+    return;
+  }
+
   const { signal } = abortController;
   
   // Use fetch with ReadableStream for SSE

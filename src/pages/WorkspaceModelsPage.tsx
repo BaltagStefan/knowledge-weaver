@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
+import { getProxyUrl, normalizeLlmEndpoint } from '@/lib/llm';
 import { getWorkspaceSettings, saveWorkspaceSettings } from '@/db/repo';
 import type { ModelSettings, EndpointConfig, ReasoningMode } from '@/types/database';
 import { DEFAULT_MODEL_SETTINGS } from '@/types/database';
@@ -34,50 +35,13 @@ const REASONING_MODES: { value: ReasoningMode; label: string; description: strin
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 
-const getProxyUrl = (endpoint: string, proxyBase: string): string => {
-  if (!import.meta.env.DEV || !endpoint) return endpoint;
-  try {
-    const url = new URL(endpoint);
-    return `${proxyBase}${url.pathname}${url.search}`;
-  } catch {
-    return endpoint;
-  }
-};
-
-const LLM_ENDPOINT_PATH_REGEX = /\/(chat\/completions|completions|responses)$/i;
-const LLM_DEFAULT_PATH = '/chat/completions';
-
-const ensureLlmEndpointPath = (endpoint: string): string => {
-  const trimmed = endpoint.trim();
-  if (!trimmed) return endpoint;
-
-  const hasProtocol = /^https?:\/\//i.test(trimmed);
-  const base = hasProtocol
-    ? trimmed
-    : `http://placeholder${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
-
-  try {
-    const url = new URL(base);
-    const pathname = url.pathname.replace(/\/+$/, '');
-    if (!LLM_ENDPOINT_PATH_REGEX.test(pathname)) {
-      url.pathname = pathname ? `${pathname}${LLM_DEFAULT_PATH}` : LLM_DEFAULT_PATH;
-    }
-    const normalized = url.toString();
-    return hasProtocol ? normalized : normalized.replace(/^http:\/\/placeholder/, '');
-  } catch {
-    const cleaned = trimmed.replace(/\/+$/, '');
-    if (LLM_ENDPOINT_PATH_REGEX.test(cleaned)) return trimmed;
-    return `${cleaned}${LLM_DEFAULT_PATH}`;
-  }
-};
-
 const testLlmConnection = async (endpoint: EndpointConfig): Promise<{ success: boolean; message: string }> => {
   if (!endpoint.endpoint) {
     return { success: false, message: 'Endpoint-ul nu este configurat' };
   }
   
   try {
-    const normalizedEndpoint = ensureLlmEndpointPath(endpoint.endpoint);
+    const normalizedEndpoint = normalizeLlmEndpoint(endpoint.endpoint);
     const requestUrl = getProxyUrl(normalizedEndpoint, '/api/llm');
     const response = await fetch(requestUrl, {
       method: 'POST',
