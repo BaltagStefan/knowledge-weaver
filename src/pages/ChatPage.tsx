@@ -4,7 +4,7 @@ import { useChatStore, useUIStore, useConversationsStore, useProjectsStore } fro
 import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useFilesStore } from '@/store/filesStore';
-import { streamChat } from '@/api';
+import { streamChat as streamChatN8n } from '@/api/n8nClient';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { StreamingStatus } from '@/components/chat/StreamingStatus';
@@ -35,7 +35,6 @@ export default function ChatPage() {
     currentConversationId,
     sourceSettings,
     selectedDocIds,
-    ragSettings,
     addMessage,
     startStreaming,
     setStreamingStatus,
@@ -187,34 +186,56 @@ export default function ChatPage() {
     const abortController = new AbortController();
     startStreaming(abortController);
 
-    streamChat(
+    if (!user || !effectiveWorkspaceId) {
+      stopStreaming();
+      toast({
+        title: t('common.error'),
+        description: t('errors.generic'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const assistantMessageId = `msg-${Date.now()}`;
+    let finalText = '';
+
+    streamChatN8n(
       {
-        conversationId: currentConversationId || undefined,
         message: content,
-        source: {
-          usePdfs: sourceSettings.usePdfs,
-          useMemory: sourceSettings.useMemory,
-          docIds: selectedDocIds.length > 0 ? selectedDocIds : undefined,
-        },
-        rag: ragSettings,
+        conversationId: currentConversationId || undefined,
+        workspaceId: effectiveWorkspaceId,
+        docIds: selectedDocIds.length > 0 ? selectedDocIds : undefined,
+        usePdfs: sourceSettings.usePdfs,
+        useMemory: sourceSettings.useMemory,
         model: llmModel?.endpoint ? llmModel : undefined,
       },
       {
         onToken: (text) => {
           setIsTyping(false);
+          finalText += text;
           appendStreamingText(text);
           scrollToBottom();
         },
-        onCitations: (event) => {
-          setCitations(event.items);
+        onCitations: (citations) => {
+          const mapped = citations.map((citation) => ({
+            type: 'pdf' as const,
+            docId: citation.docId,
+            filename: citation.filename,
+            page: citation.page,
+            score: citation.score,
+            snippet: citation.text,
+          }));
+          setCitations(mapped);
         },
         onStatus: (status) => {
-          setStreamingStatus(status);
+          if (status === 'searching_pdfs' || status === 'searching_memory' || status === 'generating') {
+            setStreamingStatus(status);
+          }
         },
-        onDone: (messageId, finalText) => {
+        onDone: () => {
           setIsTyping(false);
           const assistantMessage: Message = {
-            id: messageId,
+            id: assistantMessageId,
             conversationId: convId,
             role: 'assistant',
             content: finalText,
@@ -234,31 +255,23 @@ export default function ChatPage() {
           stopStreaming();
           scrollToBottom();
         },
-        onError: (error) => {
+        onError: (errorMessage) => {
           setIsTyping(false);
           stopStreaming();
-          
-          if (error.status === 429) {
-            toast({
-              title: t('errors.rateLimited'),
-              description: `${t('errors.rateLimited')} ${error.retryAfter || 60} ${t('errors.seconds')}`,
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: t('common.error'),
-              description: error.message,
-              variant: 'destructive',
-            });
-          }
+          toast({
+            title: t('common.error'),
+            description: errorMessage || t('errors.network'),
+            variant: 'destructive',
+          });
         },
       },
-      abortController
+      abortController.signal
     );
   }, [
-    currentConversationId, currentProjectId, sourceSettings, selectedDocIds, ragSettings,
+    currentConversationId, currentProjectId, sourceSettings, selectedDocIds,
     addMessage, addConversation, setCurrentConversation, startStreaming, setStreamingStatus, 
-    appendStreamingText, stopStreaming, setCitations, scrollToBottom, t, llmModel
+    appendStreamingText, stopStreaming, setCitations, scrollToBottom, t, llmModel,
+    effectiveWorkspaceId, user
   ]);
 
   const handleRegenerate = useCallback(() => {
