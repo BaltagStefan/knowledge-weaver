@@ -16,6 +16,9 @@ interface PDFPreviewModalProps {
   onClose: () => void;
 }
 
+type PDFDocumentProxy = Awaited<ReturnType<ReturnType<typeof getPdfjs>['getDocument']>['promise']>;
+type RenderTask = ReturnType<Awaited<ReturnType<PDFDocumentProxy['getPage']>>['render']>;
+
 export function PDFPreviewModal({ file, onClose }: PDFPreviewModalProps) {
   const pdfjsLib = getPdfjs();
   const [isLoading, setIsLoading] = useState(true);
@@ -24,8 +27,8 @@ export function PDFPreviewModal({ file, onClose }: PDFPreviewModalProps) {
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
-  const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null);
+  const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+  const renderTaskRef = useRef<RenderTask | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
