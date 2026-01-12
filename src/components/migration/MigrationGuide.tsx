@@ -533,7 +533,7 @@ server {
         <CardContent className="space-y-4">
           <div className="space-y-4">
             <div className="border-l-4 border-red-500 pl-4">
-              <h5 className="font-semibold">CORS Errors</h5>
+              <h5 className="font-semibold">CORS Errors - n8n</h5>
               <p className="text-sm text-muted-foreground mb-2">
                 Frontend-ul nu poate accesa n8n din cauza politicilor CORS.
               </p>
@@ -544,6 +544,120 @@ N8N_CORS_ORIGINS=http://localhost:5173,https://your-domain.com
 # Sau folosește proxy Nginx (recomandat pentru producție)`}
                 language="bash"
               />
+            </div>
+
+            <div className="border-l-4 border-red-500 pl-4">
+              <h5 className="font-semibold">CORS Errors - Modele Locale (LLM, Vector DB)</h5>
+              <p className="text-sm text-muted-foreground mb-2">
+                Când folosești modele hostate local (Ollama, LM Studio, Qdrant, etc.) pe HTTP, 
+                browser-ul blochează request-urile din cauza politicilor CORS.
+              </p>
+              
+              <div className="space-y-3 mt-3">
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <h6 className="font-medium text-sm mb-2">Soluția 1: Proxy Vite (Dezvoltare)</h6>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Proiectul vine preconfigurat cu proxy-uri în <code className="bg-background px-1 rounded">vite.config.ts</code>. 
+                    Modifică target-urile pentru a pointa către serviciile tale:
+                  </p>
+                  <CodeWithConfig
+                    code={`// vite.config.ts - deja configurat
+proxy: {
+  // LLM API (Ollama, LM Studio, vLLM)
+  '/api/llm': {
+    target: 'http://localhost:11434', // Schimbă portul
+    changeOrigin: true,
+    rewrite: (path) => path.replace(/^\\/api\\/llm/, ''),
+  },
+  // Vector DB (Qdrant, Milvus, ChromaDB)
+  '/api/vectordb': {
+    target: 'http://localhost:6333', // Schimbă portul
+    changeOrigin: true,
+    rewrite: (path) => path.replace(/^\\/api\\/vectordb/, ''),
+  },
+}
+
+// În WorkspaceModelsPage, folosește URL-uri relative:
+// În loc de: http://localhost:11434/v1/chat/completions
+// Folosește: /api/llm/v1/chat/completions`}
+                    language="typescript"
+                    configs={[
+                      { placeholder: 'http://localhost:11434', description: 'URL-ul LLM-ului tău local (ex: 11434 pentru Ollama, 1234 pentru LM Studio)' },
+                      { placeholder: 'http://localhost:6333', description: 'URL-ul Vector DB (ex: 6333 pentru Qdrant, 8000 pentru ChromaDB)' },
+                    ]}
+                  />
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <h6 className="font-medium text-sm mb-2">Soluția 2: Configurare CORS pe serviciu</h6>
+                  <CodeBlock
+                    code={`# Ollama - permite CORS
+OLLAMA_ORIGINS="*" ollama serve
+
+# LM Studio - activează CORS din UI
+# Settings → Server → Enable CORS
+
+# Qdrant - config.yaml
+service:
+  enable_cors: true
+  cors_origins:
+    - "http://localhost:5173"
+    - "http://localhost:8080"
+
+# ChromaDB - la pornire
+chroma run --path ./data --cors-origins "http://localhost:*"`}
+                    language="bash"
+                  />
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <h6 className="font-medium text-sm mb-2">Soluția 3: Reverse Proxy Nginx (Producție)</h6>
+                  <CodeWithConfig
+                    code={`# nginx.conf
+server {
+    listen 443 ssl;
+    server_name api.your-domain.com;
+    
+    # Proxy pentru LLM local
+    location /llm/ {
+        proxy_pass http://localhost:11434/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        
+        # Headers pentru CORS
+        add_header 'Access-Control-Allow-Origin' '*';
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+        
+        # SSE support
+        proxy_buffering off;
+        proxy_cache off;
+    }
+    
+    # Proxy pentru Vector DB
+    location /vectordb/ {
+        proxy_pass http://localhost:6333/;
+        add_header 'Access-Control-Allow-Origin' '*';
+    }
+}`}
+                    language="nginx"
+                    configs={[
+                      { placeholder: 'api.your-domain.com', description: 'Subdomeniul pentru API-uri' },
+                      { placeholder: 'http://localhost:11434/', description: 'URL-ul LLM local' },
+                      { placeholder: 'http://localhost:6333/', description: 'URL-ul Vector DB local' },
+                    ]}
+                  />
+                </div>
+              </div>
+              
+              <Alert className="mt-3">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Sfat pentru dezvoltare</AlertTitle>
+                <AlertDescription>
+                  Pentru teste rapide, folosește proxy-ul Vite cu URL-uri ca <code className="bg-background px-1 rounded">/api/llm/v1/chat/completions</code>.
+                  În producție, recomandăm reverse proxy cu HTTPS.
+                </AlertDescription>
+              </Alert>
             </div>
 
             <div className="border-l-4 border-yellow-500 pl-4">
