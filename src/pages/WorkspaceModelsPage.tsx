@@ -34,13 +34,24 @@ const REASONING_MODES: { value: ReasoningMode; label: string; description: strin
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 
+const getProxyUrl = (endpoint: string, proxyBase: string): string => {
+  if (!import.meta.env.DEV || !endpoint) return endpoint;
+  try {
+    const url = new URL(endpoint);
+    return `${proxyBase}${url.pathname}${url.search}`;
+  } catch {
+    return endpoint;
+  }
+};
+
 const testLlmConnection = async (endpoint: EndpointConfig): Promise<{ success: boolean; message: string }> => {
   if (!endpoint.endpoint) {
     return { success: false, message: 'Endpoint-ul nu este configurat' };
   }
   
   try {
-    const response = await fetch(endpoint.endpoint, {
+    const requestUrl = getProxyUrl(endpoint.endpoint, '/api/llm');
+    const response = await fetch(requestUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -76,7 +87,8 @@ const testVectorDbConnection = async (endpoint: EndpointConfig): Promise<{ succe
   }
   
   try {
-    const response = await fetch(endpoint.endpoint, {
+    const requestUrl = getProxyUrl(endpoint.endpoint, '/api/vectordb');
+    const response = await fetch(requestUrl, {
       method: 'GET',
       headers: {
         ...(endpoint.apiKey ? { 'api-key': endpoint.apiKey } : {}),
