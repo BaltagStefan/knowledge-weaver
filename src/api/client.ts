@@ -28,6 +28,22 @@ import type {
 // ============================================
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+// Function to determine which proxy to use based on endpoint
+function getApiBaseUrl(endpoint: string): string {
+  if (endpoint.startsWith('/chat/') || endpoint.startsWith('/llm/')) {
+    return '/api/llm';
+  }
+  if (endpoint.startsWith('/embed/')) {
+    return '/api/embed';
+  }
+  if (endpoint.startsWith('/vectordb/')) {
+    return '/api/vectordb';
+  }
+  // Default fallback
+  return API_BASE_URL;
+}
+
 const SSE_TIMEOUT = 120000; // 2 minutes
 
 // Debug logger - disabled in production
@@ -153,7 +169,8 @@ async function fetchWithAuth<T>(
   }
   
   // Include credentials for cookie-based auth
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const baseUrl = getApiBaseUrl(endpoint);
+  const response = await fetch(`${baseUrl}${endpoint}`, {
     ...fetchOptions,
     headers,
     credentials: 'include', // For HttpOnly cookie support
@@ -249,7 +266,7 @@ export const docsApi = {
         }));
       });
       
-      xhr.open('POST', `${API_BASE_URL}/docs/upload`);
+      xhr.open('POST', `${getApiBaseUrl('/docs/upload')}/docs/upload`);
       
       const token = getAuthToken();
       if (token) {
@@ -329,7 +346,7 @@ export function streamChat(
   const { signal } = abortController;
   
   // Use fetch with ReadableStream for SSE
-  fetch(`${API_BASE_URL}/chat/stream`, {
+  fetch(`${getApiBaseUrl('/chat/stream')}/chat/stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -534,7 +551,7 @@ export const adminApi = {
 
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, {
+    const response = await fetch(`${getApiBaseUrl('/health')}/health`, {
       method: 'GET',
       credentials: 'include',
     });

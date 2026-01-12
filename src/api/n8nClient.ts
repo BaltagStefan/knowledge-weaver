@@ -13,6 +13,21 @@ import type {
 // ============================================
 const N8N_BASE_URL = import.meta.env.VITE_N8N_WEBHOOK_BASE_URL || '/api';
 
+// Function to determine which proxy to use based on endpoint
+function getN8nApiBaseUrl(endpoint: string): string {
+  if (endpoint.startsWith('/chat/') || endpoint.startsWith('/llm/')) {
+    return '/api/llm';
+  }
+  if (endpoint.startsWith('/embed/')) {
+    return '/api/embed';
+  }
+  if (endpoint.startsWith('/vectordb/')) {
+    return '/api/vectordb';
+  }
+  // Default fallback
+  return N8N_BASE_URL;
+}
+
 // ============================================
 // Types
 // ============================================
@@ -94,7 +109,7 @@ async function n8nPost<T>(
     ...(keycloakToken && { keycloakToken }),
   };
 
-  const response = await fetch(`${N8N_BASE_URL}${endpoint}`, {
+  const response = await fetch(`${getN8nApiBaseUrl(endpoint)}${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -303,7 +318,7 @@ export const filesApi = {
 
       xhr.onerror = () => reject(new N8NError('Upload failed'));
 
-      xhr.open('POST', `${N8N_BASE_URL}/files/upload`);
+      xhr.open('POST', `${getN8nApiBaseUrl('/files/upload')}/files/upload`);
       if (keycloakToken) {
         xhr.setRequestHeader('Authorization', `Bearer ${keycloakToken}`);
       }
@@ -385,7 +400,7 @@ export async function streamChat(
   };
 
   try {
-    const response = await fetch(`${N8N_BASE_URL}/chat/stream`, {
+    const response = await fetch(`${getN8nApiBaseUrl('/chat/stream')}/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
