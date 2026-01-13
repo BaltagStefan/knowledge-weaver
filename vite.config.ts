@@ -43,6 +43,17 @@ export default defineConfig(({ mode }) => ({
         secure: false,
         rewrite: (path) => path.replace(/^\/api\/embed(\/v1)?/, "")
       },
+      // n8n webhook proxy (dev CORS)
+      "/webhook": {
+        target: "http://localhost:5678",
+        changeOrigin: true,
+        secure: false
+      },
+      "/webhook-test": {
+        target: "http://localhost:5678",
+        changeOrigin: true,
+        secure: false
+      },
       // Generic API proxy for other services
       "/api": {
         target: "http://gpt-oss-120b.kubeflow-dcpd.kubeflow.int.stscloud.ro/v1",

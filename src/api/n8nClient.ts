@@ -14,9 +14,50 @@ import type { ModelSettings } from '@/types';
 // ============================================
 const N8N_BASE_URL = import.meta.env.VITE_N8N_WEBHOOK_BASE_URL || '/api';
 
+const normalizeBaseUrl = (value: string): string =>
+  value.trim().replace(/\/+$/, '');
+
+const toDevProxyPath = (value: string): string => {
+  if (!import.meta.env.DEV) return value;
+  try {
+    const url = new URL(value);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      return url.pathname || '/';
+    }
+  } catch {
+    // Keep relative paths as-is.
+  }
+  return value;
+};
+
+const isFullWebhookUrl = (value: string): boolean => {
+  const normalized = normalizeBaseUrl(value);
+  let path = normalized;
+  try {
+    path = new URL(normalized).pathname;
+  } catch {
+    // Relative path.
+  }
+  path = path.replace(/\/+$/, '');
+  const match = path.match(/\/webhook(-test)?(\/.+)?$/);
+  return Boolean(match && match[2]);
+};
+
 // n8n webhook base URL
 function getN8nApiBaseUrl(): string {
-  return N8N_BASE_URL;
+  const normalized = normalizeBaseUrl(N8N_BASE_URL);
+  return toDevProxyPath(normalized);
+}
+
+function getN8nRequestUrl(endpoint: string): string {
+  if (/^https?:\/\//i.test(endpoint)) {
+    return endpoint;
+  }
+  const baseUrl = getN8nApiBaseUrl();
+  if (endpoint.startsWith('/chat') && isFullWebhookUrl(baseUrl)) {
+    return baseUrl;
+  }
+  return `${baseUrl}${endpoint}`;
 }
 
 // ============================================
@@ -101,7 +142,7 @@ async function n8nPost<T>(
     ...(keycloakToken && { keycloakToken }),
   };
 
-  const response = await fetch(`${getN8nApiBaseUrl()}${endpoint}`, {
+  const response = await fetch(getN8nRequestUrl(endpoint), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -310,7 +351,7 @@ export const filesApi = {
 
       xhr.onerror = () => reject(new N8NError('Upload failed'));
 
-      xhr.open('POST', `${getN8nApiBaseUrl()}/files/upload`);
+      xhr.open('POST', getN8nRequestUrl('/files/upload'));
       if (keycloakToken) {
         xhr.setRequestHeader('Authorization', `Bearer ${keycloakToken}`);
       }
@@ -380,6 +421,7 @@ export async function streamChat(
   const keycloakToken = await ensureTokenValid();
   
   const payload = {
+    context: 'message',
     message: request.message,
     conversationId: request.conversationId,
     docIds: request.docIds,
@@ -393,7 +435,7 @@ export async function streamChat(
   };
 
   try {
-    const response = await fetch(`${getN8nApiBaseUrl()}/chat/stream`, {
+    const response = await fetch(getN8nRequestUrl('/chat/stream'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -481,6 +523,7 @@ export async function sendChat(
   return n8nPost<{ content: string; citations?: Citation[] }>(
     '/chat',
     {
+      context: 'message',
       message: request.message,
       conversationId: request.conversationId,
       docIds: request.docIds,
