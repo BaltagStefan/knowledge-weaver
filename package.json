@@ -10,6 +10,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "preview:full": "node scripts/previewFull.js",
     "test": "node scripts/previewFull.js"
   },
   "dependencies": {

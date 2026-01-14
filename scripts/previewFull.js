@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 
-const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const nodeCmd = process.execPath;
+const spawnShell = (command) =>
+  spawn(command, { stdio: 'inherit', shell: true });
 
-const receiver = spawn(nodeCmd, ['server/n8nReceiver.js'], { stdio: 'inherit' });
-const preview = spawn(npmCmd, ['run', 'preview'], { stdio: 'inherit' });
+const receiver = spawnShell('node server/n8nReceiver.js');
+const preview = spawnShell('npm run preview');
 
 let shuttingDown = false;
 
@@ -30,6 +30,16 @@ preview.on('exit', (code) => {
     return;
   }
   shutdown(receiver.exitCode ?? 0);
+});
+
+receiver.on('error', (error) => {
+  console.error('[preview:full] receiver failed to start:', error);
+  shutdown(1);
+});
+
+preview.on('error', (error) => {
+  console.error('[preview:full] preview failed to start:', error);
+  shutdown(1);
 });
 
 process.on('SIGINT', () => shutdown(0));
