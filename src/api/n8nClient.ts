@@ -13,6 +13,9 @@ import type { ModelSettings } from '@/types';
 // Configuration
 // ============================================
 const N8N_BASE_URL = import.meta.env.VITE_N8N_WEBHOOK_BASE_URL || '/api';
+const N8N_CHAT_WEBHOOK_URL = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL || '';
+
+const N8N_WEBHOOK_PREFIX = /^\/webhook(-test)?(\/|$)/;
 
 const normalizeBaseUrl = (value: string): string =>
   value.trim().replace(/\/+$/, '');
@@ -21,8 +24,9 @@ const toDevProxyPath = (value: string): string => {
   if (!import.meta.env.DEV) return value;
   try {
     const url = new URL(value);
-    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-      return url.pathname || '/';
+    const pathname = url.pathname || '/';
+    if (N8N_WEBHOOK_PREFIX.test(pathname)) {
+      return pathname;
     }
   } catch {
     // Keep relative paths as-is.
@@ -43,18 +47,28 @@ const isFullWebhookUrl = (value: string): boolean => {
   return Boolean(match && match[2]);
 };
 
+const resolveN8nBaseUrl = (value: string): string =>
+  toDevProxyPath(normalizeBaseUrl(value));
+
 // n8n webhook base URL
 function getN8nApiBaseUrl(): string {
-  const normalized = normalizeBaseUrl(N8N_BASE_URL);
-  return toDevProxyPath(normalized);
+  return resolveN8nBaseUrl(N8N_BASE_URL);
+}
+
+function getN8nChatBaseUrl(): string {
+  if (N8N_CHAT_WEBHOOK_URL) {
+    return resolveN8nBaseUrl(N8N_CHAT_WEBHOOK_URL);
+  }
+  return getN8nApiBaseUrl();
 }
 
 function getN8nRequestUrl(endpoint: string): string {
   if (/^https?:\/\//i.test(endpoint)) {
     return endpoint;
   }
-  const baseUrl = getN8nApiBaseUrl();
-  if (endpoint.startsWith('/chat') && isFullWebhookUrl(baseUrl)) {
+  const isChatEndpoint = endpoint.startsWith('/chat');
+  const baseUrl = isChatEndpoint ? getN8nChatBaseUrl() : getN8nApiBaseUrl();
+  if (isChatEndpoint && isFullWebhookUrl(baseUrl)) {
     return baseUrl;
   }
   return `${baseUrl}${endpoint}`;
