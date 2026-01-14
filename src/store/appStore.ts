@@ -92,6 +92,7 @@ interface ChatState {
   isStreaming: boolean;
   streamingStatus: 'idle' | 'searching_pdfs' | 'searching_memory' | 'generating';
   streamingText: string;
+  streamingConversationId: string | null;
   abortController: AbortController | null;
   
   // Live reasoning
@@ -115,16 +116,16 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateLastMessage: (content: string) => void;
   
-  startStreaming: (controller: AbortController) => void;
-  setStreamingStatus: (status: 'idle' | 'searching_pdfs' | 'searching_memory' | 'generating') => void;
-  appendStreamingText: (text: string) => void;
-  stopStreaming: () => void;
+  startStreaming: (controller: AbortController, conversationId: string) => void;
+  setStreamingStatus: (status: 'idle' | 'searching_pdfs' | 'searching_memory' | 'generating', conversationId: string) => void;
+  appendStreamingText: (text: string, conversationId: string) => void;
+  stopStreaming: (conversationId: string) => void;
   
   addReasoningStep: (step: string) => void;
   clearReasoning: () => void;
   setIsReasoning: (isReasoning: boolean) => void;
   
-  setCitations: (citations: Citation[]) => void;
+  setCitations: (citations: Citation[], conversationId: string) => void;
   selectCitation: (id: string | null) => void;
   
   setSourceSettings: (settings: Partial<ChatSource>) => void;
@@ -146,6 +147,7 @@ export const useChatStore = create<ChatState>()(
       isStreaming: false,
       streamingStatus: 'idle',
       streamingText: '',
+      streamingConversationId: null,
       abortController: null,
       
       reasoningSteps: [],
@@ -185,6 +187,7 @@ export const useChatStore = create<ChatState>()(
             messages: [], 
             currentCitations: [],
             streamingText: '',
+            streamingConversationId: null,
             reasoningSteps: [],
             isReasoning: false,
           });
@@ -199,6 +202,7 @@ export const useChatStore = create<ChatState>()(
           messages: newMessages, 
           currentCitations: [],
           streamingText: '',
+          streamingConversationId: null,
           reasoningSteps: [],
           isReasoning: false,
         });
@@ -236,22 +240,47 @@ export const useChatStore = create<ChatState>()(
         return { messages, messagesById: updatedMessagesById };
       }),
       
-      startStreaming: (abortController) => set({ isStreaming: true, streamingText: '', abortController, reasoningSteps: [], isReasoning: true }),
-      setStreamingStatus: (streamingStatus) => set({ streamingStatus }),
-      appendStreamingText: (text) => set((state) => ({ streamingText: state.streamingText + text })),
-      stopStreaming: () => {
-        const { abortController } = get();
+      startStreaming: (abortController, conversationId) => set({
+        isStreaming: true,
+        streamingText: '',
+        streamingConversationId: conversationId,
+        abortController,
+        reasoningSteps: [],
+        isReasoning: true,
+      }),
+      setStreamingStatus: (streamingStatus, conversationId) => set((state) => (
+        state.streamingConversationId === conversationId ? { streamingStatus } : {}
+      )),
+      appendStreamingText: (text, conversationId) => set((state) => (
+        state.streamingConversationId === conversationId
+          ? { streamingText: state.streamingText + text }
+          : {}
+      )),
+      stopStreaming: (conversationId) => {
+        const { abortController, streamingConversationId } = get();
+        if (streamingConversationId && streamingConversationId !== conversationId) {
+          return;
+        }
         if (abortController) {
           abortController.abort();
         }
-        set({ isStreaming: false, streamingStatus: 'idle', streamingText: '', abortController: null, isReasoning: false });
+        set({
+          isStreaming: false,
+          streamingStatus: 'idle',
+          streamingText: '',
+          streamingConversationId: null,
+          abortController: null,
+          isReasoning: false,
+        });
       },
       
       addReasoningStep: (step) => set((state) => ({ reasoningSteps: [...state.reasoningSteps, step] })),
       clearReasoning: () => set({ reasoningSteps: [], isReasoning: false }),
       setIsReasoning: (isReasoning) => set({ isReasoning }),
       
-      setCitations: (currentCitations) => set({ currentCitations }),
+      setCitations: (currentCitations, conversationId) => set((state) => (
+        state.streamingConversationId === conversationId ? { currentCitations } : {}
+      )),
       selectCitation: (selectedCitationId) => set({ selectedCitationId }),
       
       setSourceSettings: (settings) => set((state) => ({
@@ -268,6 +297,7 @@ export const useChatStore = create<ChatState>()(
         currentCitations: [], 
         selectedCitationId: null,
         streamingText: '',
+        streamingConversationId: null,
         isStreaming: false,
         streamingStatus: 'idle',
         reasoningSteps: [],
@@ -281,6 +311,7 @@ export const useChatStore = create<ChatState>()(
         currentCitations: [],
         selectedCitationId: null,
         streamingText: '',
+        streamingConversationId: null,
         isStreaming: false,
         streamingStatus: 'idle',
         reasoningSteps: [],

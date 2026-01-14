@@ -1,10 +1,11 @@
 import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useChatStore, useUIStore, useConversationsStore, useProjectsStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useFilesStore } from '@/store/filesStore';
-import { streamChat as streamChatN8n } from '@/api/n8nClient';
+import { sendChat } from '@/api/n8nClient';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { StreamingStatus } from '@/components/chat/StreamingStatus';
@@ -32,13 +33,12 @@ export default function ChatPage() {
     messages,
     isStreaming,
     streamingText,
+    streamingConversationId,
     currentConversationId,
     sourceSettings,
     selectedDocIds,
     addMessage,
     startStreaming,
-    setStreamingStatus,
-    appendStreamingText,
     stopStreaming,
     setCitations,
     setCurrentConversation,
@@ -184,10 +184,10 @@ export default function ChatPage() {
     setIsTyping(true);
 
     const abortController = new AbortController();
-    startStreaming(abortController);
+    startStreaming(abortController, convId);
 
     if (!user || !effectiveWorkspaceId) {
-      stopStreaming();
+      stopStreaming(convId);
       toast({
         title: t('common.error'),
         description: t('errors.generic'),
@@ -197,80 +197,103 @@ export default function ChatPage() {
     }
 
     const assistantMessageId = `msg-${Date.now()}`;
-    let finalText = '';
+    const actor = {
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+    };
+    const clientRequestId = uuidv4();
 
-    streamChatN8n(
-      {
-        message: content,
-        conversationId: currentConversationId || undefined,
-        workspaceId: effectiveWorkspaceId,
-        docIds: selectedDocIds.length > 0 ? selectedDocIds : undefined,
-        usePdfs: sourceSettings.usePdfs,
-        useMemory: sourceSettings.useMemory,
-        model: llmModel?.endpoint ? llmModel : undefined,
-      },
-      {
-        onToken: (text) => {
-          setIsTyping(false);
-          finalText += text;
-          appendStreamingText(text);
-          scrollToBottom();
+    try {
+      const response = await sendChat(
+        {
+          message: content,
+          conversationId: convId,
+          clientRequestId,
+          workspaceId: effectiveWorkspaceId,
+          docIds: selectedDocIds.length > 0 ? selectedDocIds : undefined,
+          usePdfs: sourceSettings.usePdfs,
+          useMemory: sourceSettings.useMemory,
+          model: llmModel?.endpoint ? llmModel : undefined,
         },
-        onCitations: (citations) => {
-          const mapped = citations.map((citation) => ({
-            type: 'pdf' as const,
-            docId: citation.docId,
-            filename: citation.filename,
-            page: citation.page,
-            score: citation.score,
-            snippet: citation.text,
-          }));
-          setCitations(mapped);
-        },
-        onStatus: (status) => {
-          if (status === 'searching_pdfs' || status === 'searching_memory' || status === 'generating') {
-            setStreamingStatus(status);
-          }
-        },
-        onDone: () => {
-          setIsTyping(false);
-          const assistantMessage: Message = {
-            id: assistantMessageId,
-            conversationId: convId,
-            role: 'assistant',
-            content: finalText,
-            createdAt: new Date().toISOString(),
-          };
-          addMessage(assistantMessage);
-          
-          // Update conversation messageCount for assistant response
-          const existingConv = getConversationsForUser(user?.id || '').find(c => c.id === convId);
-          if (existingConv) {
-            updateConversation(convId, {
-              messageCount: existingConv.messageCount + 1,
-              updatedAt: new Date().toISOString(),
-            });
-          }
-          
-          stopStreaming();
-          scrollToBottom();
-        },
-        onError: (errorMessage) => {
-          setIsTyping(false);
-          stopStreaming();
-          toast({
-            title: t('common.error'),
-            description: errorMessage || t('errors.network'),
-            variant: 'destructive',
-          });
-        },
-      },
-      abortController.signal
-    );
+        actor,
+        abortController.signal
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || response.message || t('errors.generic'));
+      }
+
+      const responseConversationId = response.data?.conversationId;
+      const responseRequestId = response.data?.clientRequestId;
+      if (responseRequestId && responseRequestId !== clientRequestId) {
+        throw new Error('clientRequestId mismatch');
+      }
+      if (responseConversationId && responseConversationId !== convId) {
+        throw new Error('conversationId mismatch');
+      }
+
+      const replyText = response.data?.content;
+      if (!replyText) {
+        throw new Error(t('errors.generic'));
+      }
+
+      const mappedCitations = response.data?.citations?.map((citation) => ({
+        type: 'pdf' as const,
+        docId: citation.docId,
+        filename: citation.filename,
+        page: citation.page,
+        score: citation.score,
+        snippet: citation.text,
+      })) ?? [];
+
+      if (mappedCitations.length) {
+        setCitations(mappedCitations, convId);
+      } else {
+        setCitations([], convId);
+      }
+
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        conversationId: convId,
+        role: 'assistant',
+        content: replyText,
+        createdAt: new Date().toISOString(),
+        ...(mappedCitations.length ? { citations: mappedCitations } : {}),
+      };
+      addMessage(assistantMessage);
+
+      // Update conversation messageCount for assistant response
+      const existingConv = getConversationsForUser(user?.id || '').find(c => c.id === convId);
+      if (existingConv) {
+        updateConversation(convId, {
+          messageCount: existingConv.messageCount + 1,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      stopStreaming(convId);
+      setIsTyping(false);
+      scrollToBottom();
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        stopStreaming(convId);
+        setIsTyping(false);
+        return;
+      }
+
+      stopStreaming(convId);
+      setIsTyping(false);
+      toast({
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('errors.network'),
+        variant: 'destructive',
+      });
+    }
   }, [
     currentConversationId, currentProjectId, sourceSettings, selectedDocIds,
-    addMessage, addConversation, setCurrentConversation, startStreaming, setStreamingStatus, 
-    appendStreamingText, stopStreaming, setCitations, scrollToBottom, t, llmModel,
+    addMessage, addConversation, setCurrentConversation, startStreaming,
+    stopStreaming, setCitations, scrollToBottom, t, llmModel,
     effectiveWorkspaceId, user
   ]);
 
@@ -282,7 +305,9 @@ export default function ChatPage() {
     }
   }, [messages, handleSend]);
 
-  const showEmptyState = messages.length === 0 && !isStreaming;
+  const isActiveStream =
+    isStreaming && !!streamingConversationId && streamingConversationId === currentConversationId;
+  const showEmptyState = messages.length === 0 && !isActiveStream;
   const lastAssistantMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i].role === 'assistant') return messages[i].id;
@@ -369,11 +394,11 @@ export default function ChatPage() {
           <div>
             {renderedMessages}
             
-            {isTyping && !streamingText && (
+            {isActiveStream && isTyping && !streamingText && (
               <TypingIndicator />
             )}
             
-            {isStreaming && streamingText && (
+            {isActiveStream && streamingText && (
               <ChatMessage
                 message={{
                   id: 'streaming',
@@ -386,7 +411,7 @@ export default function ChatPage() {
               />
             )}
             
-            <StreamingStatus />
+            {isActiveStream && <StreamingStatus />}
             
             <div ref={scrollRef} />
           </div>

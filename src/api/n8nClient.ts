@@ -96,13 +96,20 @@ export interface N8NResponse<T = unknown> {
   message?: string;
 }
 
+export interface StreamMeta {
+  clientRequestId: string;
+  conversationId?: string;
+  messageId?: string;
+}
+
 export interface StreamCallbacks {
+  onMeta?: (meta: StreamMeta) => void;
   onToken?: (token: string) => void;
   onCitations?: (citations: Citation[]) => void;
   onStatus?: (status: string) => void;
   onReasoning?: (reasoning: string) => void;
   onError?: (error: string) => void;
-  onDone?: () => void;
+  onDone?: (meta?: StreamMeta) => void;
 }
 
 export interface Citation {
@@ -116,11 +123,19 @@ export interface Citation {
 export interface ChatRequest {
   message: string;
   conversationId?: string;
+  clientRequestId?: string;
   workspaceId: string;
   docIds?: string[];
   usePdfs?: boolean;
   useMemory?: boolean;
   model?: ModelSettings;
+}
+
+export interface ChatResponseData {
+  content: string;
+  citations?: Citation[];
+  conversationId?: string;
+  clientRequestId?: string;
 }
 
 // ============================================
@@ -144,7 +159,8 @@ async function n8nPost<T>(
   endpoint: string,
   payload: Partial<N8NRequestPayload>,
   actor: { userId: string; username: string; role: string },
-  workspaceId?: string
+  workspaceId?: string,
+  signal?: AbortSignal
 ): Promise<N8NResponse<T>> {
   const keycloakToken = await ensureTokenValid();
   
@@ -152,7 +168,7 @@ async function n8nPost<T>(
     ...payload,
     workspaceId,
     actor,
-    clientRequestId: uuidv4(),
+    clientRequestId: payload.clientRequestId || uuidv4(),
     ...(keycloakToken && { keycloakToken }),
   };
 
@@ -163,6 +179,7 @@ async function n8nPost<T>(
       ...(keycloakToken && { Authorization: `Bearer ${keycloakToken}` }),
     },
     body: JSON.stringify(fullPayload),
+    signal,
   });
 
   if (!response.ok) {
@@ -434,19 +451,51 @@ export async function streamChat(
 ): Promise<void> {
   const keycloakToken = await ensureTokenValid();
   
+  const conversationId = request.conversationId;
+  const clientRequestId = request.clientRequestId || uuidv4();
+
+  const baseMeta: StreamMeta = {
+    clientRequestId,
+    conversationId,
+  };
+
   const payload = {
     context: 'message',
     message: request.message,
-    conversationId: request.conversationId,
+    conversationId,
     docIds: request.docIds,
     usePdfs: request.usePdfs,
     useMemory: request.useMemory,
     workspaceId: request.workspaceId,
     actor,
-    clientRequestId: uuidv4(),
+    clientRequestId,
     ...(keycloakToken && { keycloakToken }),
     ...(request.model && { model: request.model }),
   };
+
+  const isMatchingEvent = (event: Record<string, unknown>): boolean => {
+    const eventRequestId =
+      typeof event.clientRequestId === 'string' ? event.clientRequestId : undefined;
+    if (eventRequestId && eventRequestId !== clientRequestId) return false;
+
+    const eventConversationId =
+      typeof event.conversationId === 'string' ? event.conversationId : undefined;
+    if (eventConversationId && conversationId && eventConversationId !== conversationId) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const getEventMeta = (event: Record<string, unknown>): StreamMeta => ({
+    clientRequestId:
+      typeof event.clientRequestId === 'string' ? event.clientRequestId : clientRequestId,
+    conversationId:
+      typeof event.conversationId === 'string' ? event.conversationId : conversationId,
+    messageId: typeof event.messageId === 'string' ? event.messageId : undefined,
+  });
+
+  callbacks.onMeta?.(baseMeta);
 
   try {
     const response = await fetch(getN8nRequestUrl('/chat/stream'), {
@@ -484,14 +533,21 @@ export async function streamChat(
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim();
           if (data === '[DONE]') {
-            callbacks.onDone?.();
+            callbacks.onDone?.(baseMeta);
             return;
           }
 
           try {
-            const event = JSON.parse(data);
+            const event = JSON.parse(data) as Record<string, any>;
+            if (!isMatchingEvent(event)) {
+              continue;
+            }
+            const eventMeta = getEventMeta(event);
             
             switch (event.type) {
+              case 'meta':
+                callbacks.onMeta?.(eventMeta);
+                break;
               case 'token':
                 callbacks.onToken?.(event.content);
                 break;
@@ -508,7 +564,7 @@ export async function streamChat(
                 callbacks.onError?.(event.message);
                 break;
               case 'done':
-                callbacks.onDone?.();
+                callbacks.onDone?.(eventMeta);
                 return;
             }
           } catch {
@@ -518,7 +574,7 @@ export async function streamChat(
       }
     }
 
-    callbacks.onDone?.();
+    callbacks.onDone?.(baseMeta);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       return;
@@ -532,20 +588,23 @@ export async function streamChat(
 // ============================================
 export async function sendChat(
   request: ChatRequest,
-  actor: { userId: string; username: string; role: string }
-): Promise<N8NResponse<{ content: string; citations?: Citation[] }>> {
-  return n8nPost<{ content: string; citations?: Citation[] }>(
+  actor: { userId: string; username: string; role: string },
+  signal?: AbortSignal
+): Promise<N8NResponse<ChatResponseData>> {
+  return n8nPost<ChatResponseData>(
     '/chat',
     {
       context: 'message',
       message: request.message,
       conversationId: request.conversationId,
+      clientRequestId: request.clientRequestId,
       docIds: request.docIds,
       usePdfs: request.usePdfs,
       useMemory: request.useMemory,
       ...(request.model && { model: request.model }),
     },
     actor,
-    request.workspaceId
+    request.workspaceId,
+    signal
   );
 }

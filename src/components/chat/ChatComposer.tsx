@@ -49,6 +49,8 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
   
   const { 
     isStreaming, 
+    streamingConversationId,
+    currentConversationId,
     stopStreaming,
     sourceSettings,
     setSourceSettings,
@@ -73,6 +75,7 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
     [files]
   );
   const showQuickSuggestions = showSuggestions && messages.length === 0 && !message;
+  const activeConversationId = streamingConversationId || currentConversationId;
   const uploadProgressList = useMemo(
     () => Array.from(uploadProgress.values()),
     [uploadProgress]
@@ -90,14 +93,14 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape to stop streaming
-      if (e.key === 'Escape' && isStreaming) {
-        stopStreaming();
+      if (e.key === 'Escape' && isStreaming && activeConversationId) {
+        stopStreaming(activeConversationId);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isStreaming, stopStreaming]);
+  }, [activeConversationId, isStreaming, stopStreaming]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -107,7 +110,9 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
 
   const handleSend = useCallback(() => {
     if (isStreaming) {
-      stopStreaming();
+      if (activeConversationId) {
+        stopStreaming(activeConversationId);
+      }
       return;
     }
     
@@ -118,7 +123,7 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
     setMessage('');
     setValidation(validateMessage(''));
     textareaRef.current?.focus();
-  }, [message, validation.isValid, disabled, isStreaming, stopStreaming, onSend]);
+  }, [activeConversationId, message, validation.isValid, disabled, isStreaming, stopStreaming, onSend]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
