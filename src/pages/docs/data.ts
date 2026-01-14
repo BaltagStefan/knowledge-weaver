@@ -60,7 +60,10 @@ export const apiEndpoints = [
   { path: '/files/index', description: 'Indexare documente', role: 'user_plus' },
   { path: '/settings/get', description: 'Obține setări', role: 'user' },
   { path: '/settings/save', description: 'Salvează setări', role: 'admin' },
+  { path: '/chat', description: 'Chat JSON (non-stream)', role: 'user' },
   { path: '/chat/stream', description: 'Chat SSE streaming', role: 'user' },
+  { path: '/api/n8n/chat/response', description: 'Receiver webhook din n8n (callback)', role: 'any' },
+  { path: '/api/n8n/chat/response/poll', description: 'Long-poll pentru raspuns', role: 'user' },
 ];
 
 export const stores = [
@@ -95,11 +98,12 @@ export const stores = [
     description: 'Mesaje, streaming, citări',
     persisted: true,
     code: `interface ChatState {
-  messages: Message[];
+  currentConversationId: string | null;
+  messagesById: Record<string, Message[]>;
   isStreaming: boolean;
-  citations: Citation[];
-  sendMessage: (content: string) => Promise<void>;
-  addStreamToken: (token: string) => void;
+  streamingConversationId: string | null;
+  currentCitations: Citation[];
+  addMessage: (message: Message) => void;
 }`,
   },
 ];

@@ -2,36 +2,13 @@ import React from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useChatStore } from '@/store/appStore';
 import { cn } from '@/lib/utils';
-import { Loader2, Search, FileText, Brain, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 
 export function StreamingStatus() {
   const { t } = useTranslation();
-  const { isStreaming, streamingStatus } = useChatStore();
+  const isStreaming = useChatStore((state) => state.isStreaming);
 
-  if (!isStreaming || streamingStatus === 'idle') return null;
-
-  const statusConfig = {
-    searching_pdfs: {
-      icon: FileText,
-      text: t('chat.searchingPdfs'),
-      color: 'text-blue-500',
-    },
-    searching_memory: {
-      icon: Brain,
-      text: t('chat.searchingMemory'),
-      color: 'text-purple-500',
-    },
-    generating: {
-      icon: Sparkles,
-      text: t('chat.generating'),
-      color: 'text-accent',
-    },
-  };
-
-  const config = statusConfig[streamingStatus];
-  if (!config) return null;
-
-  const Icon = config.icon;
+  if (!isStreaming) return null;
 
   return (
     <div className="flex items-center justify-center py-3 px-4">
@@ -39,9 +16,9 @@ export function StreamingStatus() {
         "flex items-center gap-2 px-4 py-2 rounded-full",
         "bg-muted/50 border border-border"
       )}>
-        <Loader2 className={cn("h-4 w-4 animate-spin", config.color)} />
-        <Icon className={cn("h-4 w-4", config.color)} />
-        <span className="text-sm text-muted-foreground">{config.text}</span>
+        <Loader2 className="h-4 w-4 animate-spin text-accent" />
+        <Sparkles className="h-4 w-4 text-accent" />
+        <span className="text-sm text-muted-foreground">{t('chat.generating')}</span>
       </div>
     </div>
   );

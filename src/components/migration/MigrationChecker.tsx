@@ -83,7 +83,7 @@ export function MigrationChecker() {
       await new Promise(resolve => setTimeout(resolve, 300));
       
       switch (results[i].id) {
-        case 'env-n8n':
+        case 'env-n8n': {
           const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_BASE_URL;
           if (n8nUrl && n8nUrl !== 'undefined') {
             results[i].status = 'success';
@@ -94,8 +94,9 @@ export function MigrationChecker() {
             results[i].details = 'VITE_N8N_WEBHOOK_BASE_URL=https://your-n8n.com/webhook';
           }
           break;
+        }
           
-        case 'env-keycloak-url':
+        case 'env-keycloak-url': {
           const kcUrl = import.meta.env.VITE_KEYCLOAK_URL;
           if (kcUrl && kcUrl !== 'undefined') {
             results[i].status = 'success';
@@ -106,8 +107,9 @@ export function MigrationChecker() {
             results[i].details = 'VITE_KEYCLOAK_URL=https://your-keycloak.com';
           }
           break;
+        }
           
-        case 'env-keycloak-realm':
+        case 'env-keycloak-realm': {
           const kcRealm = import.meta.env.VITE_KEYCLOAK_REALM;
           if (kcRealm && kcRealm !== 'undefined') {
             results[i].status = 'success';
@@ -117,8 +119,9 @@ export function MigrationChecker() {
             results[i].message = 'Opțional dacă nu folosești Keycloak';
           }
           break;
+        }
           
-        case 'env-keycloak-client':
+        case 'env-keycloak-client': {
           const kcClient = import.meta.env.VITE_KEYCLOAK_CLIENT_ID;
           if (kcClient && kcClient !== 'undefined') {
             results[i].status = 'success';
@@ -128,6 +131,7 @@ export function MigrationChecker() {
             results[i].message = 'Opțional dacă nu folosești Keycloak';
           }
           break;
+        }
           
         case 'indexeddb':
           if ('indexedDB' in window) {

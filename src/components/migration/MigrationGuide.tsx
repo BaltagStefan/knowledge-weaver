@@ -207,6 +207,13 @@ cp .env.example .env`}
 VITE_N8N_WEBHOOK_BASE_URL=https://your-n8n-instance.com/webhook
 
 # ============================================
+# OBLIGATORIU - n8n Receiver (callback)
+# ============================================
+# Backend-ul care primeste POST-urile de raspuns
+VITE_N8N_RECEIVER_BASE_URL=/api/n8n
+VITE_N8N_RECEIVER_URL=http://localhost:8787
+
+# ============================================
 # OPȚIONAL - Keycloak SSO
 # ============================================
 # Dacă folosești Keycloak pentru autentificare admin
@@ -223,6 +230,8 @@ VITE_DEFAULT_THEME=system`}
                   title=".env"
                   configs={[
                     { placeholder: 'https://your-n8n-instance.com/webhook', description: 'URL-ul instanței tale n8n (ex: https://n8n.compania.ro/webhook sau http://localhost:5678/webhook)' },
+                    { placeholder: '/api/n8n', description: 'Base URL folosit de frontend pentru receiver (prin proxy Vite)' },
+                    { placeholder: 'http://localhost:8787', description: 'URL-ul backend-ului receiver (folosit de proxy-ul Vite)' },
                     { placeholder: 'https://your-keycloak.com', description: 'URL-ul Keycloak (opțional, doar dacă folosești SSO)' },
                     { placeholder: 'your-realm', description: 'Numele realm-ului din Keycloak' },
                     { placeholder: 'kotaemon-frontend', description: 'Client ID configurat în Keycloak' },
@@ -235,6 +244,15 @@ VITE_DEFAULT_THEME=system`}
                   <AlertDescription>
                     După configurare, pornește aplicația cu <code className="bg-muted px-1 rounded">npm run dev</code> și 
                     accesează <code className="bg-muted px-1 rounded">/docs</code> pentru a verifica automat configurațiile.
+                  </AlertDescription>
+                </Alert>
+
+                <Alert>
+                  <Server className="h-4 w-4" />
+                  <AlertTitle>Pornește receiver-ul</AlertTitle>
+                  <AlertDescription>
+                    Rulează <code className="bg-muted px-1 rounded">npm run dev:receiver</code> pentru backend-ul care primește
+                    POST-urile de răspuns din n8n.
                   </AlertDescription>
                 </Alert>
               </AccordionContent>
@@ -309,6 +327,43 @@ const response = await fetch("http://your-kotaemon-backend:7860/api/chat", {
                     title="n8n-chat-workflow.js"
                     configs={[
                       { placeholder: 'http://your-kotaemon-backend:7860', description: 'URL-ul backend-ului Kotaemon existent (dacă faci proxy)' },
+                    ]}
+                  />
+                </div>
+
+                <div className="border rounded-lg p-4 space-y-4">
+                  <h5 className="font-semibold">Workflow callback (non-stream): /chat + response webhook</h5>
+                  <CodeWithConfig
+                    code={`// n8n Workflow - Chat cu raspuns JSON (non-stream)
+// Noduri necesare:
+
+// 1. WEBHOOK TRIGGER
+{
+  "httpMethod": "POST",
+  "path": "chat",
+  "responseMode": "onReceived"
+}
+
+// 2. CODE NODE - Parse Request
+const { message, conversationId, clientRequestId } = $input.first().json;
+
+// 3. GENEREAZA RASPUNS (LLM / RAG / etc)
+const content = await generateAnswer(message);
+
+// 4. HTTP REQUEST - Trimite raspunsul catre receiver
+POST http://localhost:8787/api/n8n/chat/response
+{
+  "success": true,
+  "data": {
+    "clientRequestId": clientRequestId,
+    "conversationId": conversationId,
+    "content": content
+  }
+}`}
+                    language="javascript"
+                    title="n8n-chat-response-workflow.js"
+                    configs={[
+                      { placeholder: 'http://localhost:8787', description: 'URL-ul backend-ului receiver (portul implicit)' },
                     ]}
                   />
                 </div>

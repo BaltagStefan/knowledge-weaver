@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Download, FileText, FileType } from 'lucide-react';
+import type { Message } from '@/types';
 
 interface ExportButtonProps {
   conversationId?: string;
@@ -19,9 +20,16 @@ interface ExportButtonProps {
   size?: 'default' | 'sm' | 'icon';
 }
 
+const EMPTY_MESSAGES: Message[] = [];
+
 export function ExportButton({ conversationId, variant = 'ghost', size = 'icon' }: ExportButtonProps) {
   const { t } = useTranslation();
-  const { messages, currentConversationId } = useChatStore();
+  const currentConversationId = useChatStore((state) => state.currentConversationId);
+  const exportMessages = useChatStore((state) => {
+    const targetConversationId = conversationId || state.currentConversationId;
+    if (!targetConversationId) return EMPTY_MESSAGES;
+    return state.messagesById[targetConversationId] || EMPTY_MESSAGES;
+  });
   const { conversations } = useConversationsStore();
   const { projects } = useProjectsStore();
 
@@ -32,7 +40,6 @@ export function ExportButton({ conversationId, variant = 'ghost', size = 'icon' 
     : undefined;
 
   // Use current messages if no specific conversation, otherwise would need to fetch
-  const exportMessages = messages;
 
   const handleExportMarkdown = () => {
     if (!conversation) {

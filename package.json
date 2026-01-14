@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:receiver": "node server/n8nReceiver.js",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node scripts/previewFull.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

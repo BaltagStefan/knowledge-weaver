@@ -5,6 +5,7 @@ import { useFilesStore } from '@/store/filesStore';
 import { useAuthStore } from '@/store/authStore';
 import { validateMessage } from '@/lib/validation';
 import { VALIDATION } from '@/types';
+import type { Message } from '@/types';
 import { createFile, upsertIndexState } from '@/db/repo';
 import { filesApi } from '@/api/n8nClient';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,8 @@ interface ChatComposerProps {
   showSuggestions?: boolean;
 }
 
+const EMPTY_MESSAGES: Message[] = [];
+
 export function ChatComposer({ onSend, disabled = false, showSuggestions = true }: ChatComposerProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -47,17 +50,19 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
   const [validation, setValidation] = useState(validateMessage(''));
   const [maliciousDialogOpen, setMaliciousDialogOpen] = useState(false);
   
-  const { 
-    isStreaming, 
-    streamingConversationId,
-    currentConversationId,
-    stopStreaming,
-    sourceSettings,
-    setSourceSettings,
-    selectedDocIds,
-    setSelectedDocIds,
-    messages,
-  } = useChatStore();
+  const isStreaming = useChatStore((state) => state.isStreaming);
+  const streamingConversationId = useChatStore((state) => state.streamingConversationId);
+  const currentConversationId = useChatStore((state) => state.currentConversationId);
+  const stopStreaming = useChatStore((state) => state.stopStreaming);
+  const sourceSettings = useChatStore((state) => state.sourceSettings);
+  const setSourceSettings = useChatStore((state) => state.setSourceSettings);
+  const selectedDocIds = useChatStore((state) => state.selectedDocIds);
+  const setSelectedDocIds = useChatStore((state) => state.setSelectedDocIds);
+  const messages = useChatStore((state) => {
+    const conversationId = state.currentConversationId;
+    if (!conversationId) return EMPTY_MESSAGES;
+    return state.messagesById[conversationId] || EMPTY_MESSAGES;
+  });
   
   const { user } = useAuthStore();
   const { workspaceId } = useParams<{ workspaceId?: string }>();

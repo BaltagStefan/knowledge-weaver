@@ -8,7 +8,6 @@ import { useFilesStore } from '@/store/filesStore';
 import { sendChat } from '@/api/n8nClient';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
-import { StreamingStatus } from '@/components/chat/StreamingStatus';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ScrollToBottom } from '@/components/chat/ScrollToBottom';
 import { NoWorkspaceMessage } from '@/components/workspace/NoWorkspaceMessage';
@@ -21,43 +20,61 @@ import type { Message, ModelSettings } from '@/types';
 import { getFilesWithIndexState, getWorkspaceSettings } from '@/db/repo';
 import { useParams } from 'react-router-dom';
 
+const MESSAGE_WINDOW_SIZE = 50;
+const MESSAGE_WINDOW_STEP = 50;
+const EMPTY_MESSAGES: Message[] = [];
+
 export default function ChatPage() {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { sourcesPanelOpen, toggleSourcesPanel } = useUIStore();
+  const sourcesPanelOpen = useUIStore((state) => state.sourcesPanelOpen);
+  const toggleSourcesPanel = useUIStore((state) => state.toggleSourcesPanel);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [renderLimit, setRenderLimit] = useState(MESSAGE_WINDOW_SIZE);
+  const isNearBottomRef = useRef(true);
+  const messagesLengthRef = useRef(0);
   
-  const {
-    messages,
-    isStreaming,
-    streamingText,
-    streamingConversationId,
-    currentConversationId,
-    sourceSettings,
-    selectedDocIds,
-    addMessage,
-    startStreaming,
-    stopStreaming,
-    setCitations,
-    setCurrentConversation,
-  } = useChatStore();
+  const currentConversationId = useChatStore((state) => state.currentConversationId);
+  const messages = useChatStore((state) => {
+    const conversationId = state.currentConversationId;
+    if (!conversationId) return EMPTY_MESSAGES;
+    return state.messagesById[conversationId] || EMPTY_MESSAGES;
+  });
+  const isStreaming = useChatStore((state) => state.isStreaming);
+  const streamingConversationId = useChatStore((state) => state.streamingConversationId);
+  const sourceSettings = useChatStore((state) => state.sourceSettings);
+  const selectedDocIds = useChatStore((state) => state.selectedDocIds);
+  const addMessage = useChatStore((state) => state.addMessage);
+  const startStreaming = useChatStore((state) => state.startStreaming);
+  const stopStreaming = useChatStore((state) => state.stopStreaming);
+  const setCitations = useChatStore((state) => state.setCitations);
+  const setCurrentConversation = useChatStore((state) => state.setCurrentConversation);
 
-  const { currentProjectId, projects, getProjectsForUser } = useProjectsStore();
-  const { addConversation, getConversationsForUser, updateConversation } = useConversationsStore();
-  const { user } = useAuthStore();
-  const { workspaces, currentWorkspaceId } = useWorkspaceStore();
-  const { setFiles } = useFilesStore();
+  const currentProjectId = useProjectsStore((state) => state.currentProjectId);
+  const projects = useProjectsStore((state) => state.projects);
+  const addConversation = useConversationsStore((state) => state.addConversation);
+  const getConversationsForUser = useConversationsStore((state) => state.getConversationsForUser);
+  const updateConversation = useConversationsStore((state) => state.updateConversation);
+  const user = useAuthStore((state) => state.user);
+  const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
+  const setFiles = useFilesStore((state) => state.setFiles);
   const { workspaceId } = useParams<{ workspaceId?: string }>();
   const effectiveWorkspaceId = workspaceId || currentWorkspaceId || null;
   const [llmModel, setLlmModel] = useState<ModelSettings | null>(null);
 
-  const userProjects = user ? getProjectsForUser(user.id) : [];
+  const userProjects = useMemo(
+    () => (user ? projects.filter((project) => project.userId === user.id) : []),
+    [projects, user]
+  );
   
   // Check if user has any workspaces assigned
   const hasWorkspace = user?.workspaceIds && user.workspaceIds.length > 0;
-  const currentProject = userProjects.find(p => p.id === currentProjectId);
+  const currentProject = useMemo(
+    () => userProjects.find((project) => project.id === currentProjectId),
+    [currentProjectId, userProjects]
+  );
 
   useEffect(() => {
     if (!effectiveWorkspaceId) return;
@@ -122,7 +139,19 @@ export default function ChatPage() {
     };
   }, [effectiveWorkspaceId]);
 
-  const scrollToBottom = useCallback(() => {
+  useEffect(() => {
+    setRenderLimit(MESSAGE_WINDOW_SIZE);
+  }, [currentConversationId]);
+
+  useEffect(() => {
+    messagesLengthRef.current = messages.length;
+    if (messages.length === 0) {
+      setShowScrollButton(false);
+    }
+  }, [messages.length]);
+
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && !isNearBottomRef.current) return;
     setTimeout(() => {
       scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
@@ -136,12 +165,15 @@ export default function ChatPage() {
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = scrollArea;
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
-      setShowScrollButton(!isNearBottom && messages.length > 0);
+      if (isNearBottomRef.current !== isNearBottom) {
+        isNearBottomRef.current = isNearBottom;
+        setShowScrollButton(!isNearBottom && messagesLengthRef.current > 0);
+      }
     };
 
-    scrollArea.addEventListener('scroll', handleScroll);
+    scrollArea.addEventListener('scroll', handleScroll, { passive: true });
     return () => scrollArea.removeEventListener('scroll', handleScroll);
-  }, [messages.length]);
+  }, []);
 
   const handleSend = useCallback(async (content: string) => {
     // Create new conversation if none exists
@@ -178,7 +210,7 @@ export default function ChatPage() {
       createdAt: new Date().toISOString(),
     };
     addMessage(userMessage);
-    scrollToBottom();
+    scrollToBottom(true);
 
     // Show typing indicator briefly before streaming starts
     setIsTyping(true);
@@ -305,6 +337,17 @@ export default function ChatPage() {
     }
   }, [messages, handleSend]);
 
+  const visibleMessages = useMemo(() => {
+    if (messages.length <= renderLimit) return messages;
+    return messages.slice(-renderLimit);
+  }, [messages, renderLimit]);
+
+  const hiddenCount = messages.length - visibleMessages.length;
+
+  const handleLoadEarlier = useCallback(() => {
+    setRenderLimit((prev) => Math.min(prev + MESSAGE_WINDOW_STEP, messages.length));
+  }, [messages.length]);
+
   const isActiveStream =
     isStreaming && !!streamingConversationId && streamingConversationId === currentConversationId;
   const showEmptyState = messages.length === 0 && !isActiveStream;
@@ -317,14 +360,14 @@ export default function ChatPage() {
 
   const renderedMessages = useMemo(
     () =>
-      messages.map((msg) => (
+      visibleMessages.map((msg) => (
         <ChatMessage
           key={msg.id}
           message={msg}
           onRegenerate={msg.id === lastAssistantMessageId ? handleRegenerate : undefined}
         />
       )),
-    [messages, lastAssistantMessageId, handleRegenerate]
+    [visibleMessages, lastAssistantMessageId, handleRegenerate]
   );
 
   // If user has no workspace, show the no-workspace message
@@ -392,26 +435,18 @@ export default function ChatPage() {
           </div>
         ) : (
           <div>
+            {hiddenCount > 0 && (
+              <div className="flex justify-center py-3">
+                <Button variant="ghost" size="sm" onClick={handleLoadEarlier}>
+                  {t('common.previous')}
+                </Button>
+              </div>
+            )}
             {renderedMessages}
             
-            {isActiveStream && isTyping && !streamingText && (
+            {isActiveStream && isTyping && (
               <TypingIndicator />
             )}
-            
-            {isActiveStream && streamingText && (
-              <ChatMessage
-                message={{
-                  id: 'streaming',
-                  conversationId: '',
-                  role: 'assistant',
-                  content: streamingText,
-                  createdAt: new Date().toISOString(),
-                }}
-                isStreaming
-              />
-            )}
-            
-            {isActiveStream && <StreamingStatus />}
             
             <div ref={scrollRef} />
           </div>

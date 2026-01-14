@@ -21,10 +21,15 @@ const resolveN8nProxyTarget = (env: Record<string, string>): string => {
   return "http://localhost:5678";
 };
 
+const resolveN8nReceiverProxyTarget = (env: Record<string, string>): string => {
+  return env.VITE_N8N_RECEIVER_URL || "http://localhost:8787";
+};
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const n8nProxyTarget = resolveN8nProxyTarget(env);
+  const n8nReceiverProxyTarget = resolveN8nReceiverProxyTarget(env);
 
   return {
     server: {
@@ -73,6 +78,12 @@ export default defineConfig(({ mode }) => {
         },
         "/webhook-test": {
           target: n8nProxyTarget,
+          changeOrigin: true,
+          secure: false
+        },
+        // n8n callback receiver proxy (frontend -> backend)
+        "/api/n8n": {
+          target: n8nReceiverProxyTarget,
           changeOrigin: true,
           secure: false
         },

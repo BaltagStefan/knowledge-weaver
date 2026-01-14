@@ -326,6 +326,11 @@ function SetupSection() {
 # URL-ul de bază pentru toate endpoint-urile n8n
 VITE_N8N_WEBHOOK_BASE_URL=https://your-n8n-instance.com/webhook
 
+# n8n Receiver (callback) pentru rŽŸspunsuri
+# Backend-ul care primeÔTte POST-urile de la n8n
+VITE_N8N_RECEIVER_BASE_URL=/api/n8n
+VITE_N8N_RECEIVER_URL=http://localhost:8787
+
 # Keycloak Configuration
 VITE_KEYCLOAK_URL=https://your-keycloak.com
 VITE_KEYCLOAK_REALM=your-realm-name
@@ -340,6 +345,8 @@ VITE_DEFAULT_THEME=system`}
             title=".env"
             configs={[
               { placeholder: 'https://your-n8n-instance.com/webhook', description: 'URL-ul instanței tale n8n (ex: https://n8n.compania.ro/webhook)' },
+              { placeholder: '/api/n8n', description: 'Base URL folosit de frontend pentru receiver (prin proxy Vite)' },
+              { placeholder: 'http://localhost:8787', description: 'URL-ul backend-ului receiver (folosit de proxy-ul Vite)' },
               { placeholder: 'https://your-keycloak.com', description: 'URL-ul instanței Keycloak (ex: https://auth.compania.ro)' },
               { placeholder: 'your-realm-name', description: 'Numele realm-ului creat în Keycloak (ex: rag-chat)' },
               { placeholder: 'your-client-id', description: 'Client ID din Keycloak (ex: rag-chat-app)' },
@@ -363,6 +370,19 @@ VITE_DEFAULT_THEME=system`}
                 <p className="text-green-500">✓ https://n8n.compania.ro/webhook</p>
                 <p className="text-green-500">✓ http://localhost:5678/webhook</p>
                 <p className="text-red-500">✗ https://n8n.compania.ro/webhook/ (fără slash final!)</p>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Server className="h-4 w-4 text-primary" />
+                <span className="font-bold">VITE_N8N_RECEIVER_BASE_URL</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">
+                Endpoint-ul folosit de frontend pentru a prelua raspunsul din backend (via proxy).
+              </p>
+              <div className="bg-muted p-2 rounded text-xs font-mono">
+                <p className="text-green-500">/api/n8n</p>
               </div>
             </div>
 
@@ -645,6 +665,82 @@ await sendSSE({ type: 'done' });`}
               { placeholder: 'YOUR_LLM_ENDPOINT', description: 'Endpoint LLM (ex: OpenAI, Anthropic, local)' },
               { placeholder: 'YOUR_LLM_API_KEY', description: 'API Key pentru LLM' },
             ]}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            Chat Response Callback (JSON, non-stream)
+          </CardTitle>
+          <CardDescription>
+            n8n trimite raspunsul catre backend, iar frontend-ul face poll pentru a afisa mesajul.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <CodeBlock
+            code={`// Frontend -> n8n (request non-stream)
+POST https://your-n8n-url.com/webhook/chat
+Content-Type: application/json
+
+{
+  "clientRequestId": "550e8400-e29b-41d4-a716-446655440000",
+  "actor": {
+    "userId": "user-123",
+    "username": "ion.popescu",
+    "role": "user_plus"
+  },
+  "workspaceId": "ws-1",
+  "message": "Care sunt pașii pentru a solicita concediu?",
+  "conversationId": "conv-uuid",
+  "usePdfs": true,
+  "useMemory": false,
+  "docIds": ["doc-1", "doc-2"]
+}`}
+            language="json"
+            title="POST /chat"
+          />
+
+          <CodeBlock
+            code={`// n8n -> Backend receiver
+POST http://localhost:8787/api/n8n/chat/response
+Content-Type: application/json
+
+{
+  "success": true,
+  "data": {
+    "clientRequestId": "550e8400-e29b-41d4-a716-446655440000",
+    "conversationId": "conv-uuid",
+    "content": "Raspunsul complet al asistentului.",
+    "citations": [
+      {
+        "docId": "doc-1",
+        "filename": "Manual_HR.pdf",
+        "page": 42,
+        "text": "Pentru a solicita concediu...",
+        "score": 0.89
+      }
+    ]
+  }
+}`}
+            language="json"
+            title="POST /api/n8n/chat/response"
+          />
+
+          <CodeBlock
+            code={`// Frontend -> Backend (long-poll)
+POST /api/n8n/chat/response/poll
+Content-Type: application/json
+
+{
+  "clientRequestId": "550e8400-e29b-41d4-a716-446655440000",
+  "conversationId": "conv-uuid",
+  "timeoutMs": 25000
+}`}
+            language="json"
+            title="POST /api/n8n/chat/response/poll"
           />
         </CardContent>
       </Card>

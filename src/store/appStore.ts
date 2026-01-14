@@ -83,55 +83,40 @@ export const useUIStore = create<UIState>()(
 interface ChatState {
   // Current conversation
   currentConversationId: string | null;
-  messages: Message[];
-  
+
   // Messages storage per conversation (persisted)
   messagesById: Record<string, Message[]>;
-  
-  // Streaming state
+
+  // Pending request state
   isStreaming: boolean;
-  streamingStatus: 'idle' | 'searching_pdfs' | 'searching_memory' | 'generating';
-  streamingText: string;
   streamingConversationId: string | null;
   abortController: AbortController | null;
-  
-  // Live reasoning
-  reasoningSteps: string[];
-  isReasoning: boolean;
-  
+
   // Citations
   currentCitations: Citation[];
   selectedCitationId: string | null;
-  
+
   // Source settings
   sourceSettings: ChatSource;
   ragSettings: RagSettings;
-  
+
   // Selected docs
   selectedDocIds: string[];
-  
+
   // Actions
   setCurrentConversation: (id: string | null) => void;
-  setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
-  updateLastMessage: (content: string) => void;
-  
+
   startStreaming: (controller: AbortController, conversationId: string) => void;
-  setStreamingStatus: (status: 'idle' | 'searching_pdfs' | 'searching_memory' | 'generating', conversationId: string) => void;
-  appendStreamingText: (text: string, conversationId: string) => void;
   stopStreaming: (conversationId: string) => void;
-  
-  addReasoningStep: (step: string) => void;
-  clearReasoning: () => void;
-  setIsReasoning: (isReasoning: boolean) => void;
-  
+
   setCitations: (citations: Citation[], conversationId: string) => void;
   selectCitation: (id: string | null) => void;
-  
+
   setSourceSettings: (settings: Partial<ChatSource>) => void;
   setRagSettings: (settings: Partial<RagSettings>) => void;
   setSelectedDocIds: (ids: string[]) => void;
-  
+
   clearChat: () => void;
   clearUserData: () => void;
   deleteConversationMessages: (conversationId: string) => void;
@@ -141,21 +126,15 @@ export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
       currentConversationId: null,
-      messages: [],
       messagesById: {},
-      
+
       isStreaming: false,
-      streamingStatus: 'idle',
-      streamingText: '',
       streamingConversationId: null,
       abortController: null,
-      
-      reasoningSteps: [],
-      isReasoning: false,
-      
+
       currentCitations: [],
       selectedCitationId: null,
-      
+
       sourceSettings: {
         usePdfs: true,
         useMemory: true,
@@ -164,98 +143,41 @@ export const useChatStore = create<ChatState>()(
         topK: 5,
         threshold: 0.5,
       },
-      
+
       selectedDocIds: [],
-      
+
       setCurrentConversation: (conversationId) => {
-        const { messagesById, currentConversationId, messages } = get();
-        
-        // Save current messages before switching (only if there are messages)
-        if (currentConversationId && messages.length > 0) {
-          set((state) => ({
-            messagesById: {
-              ...state.messagesById,
-              [currentConversationId]: messages,
-            },
-          }));
-        }
-        
-        // If switching to null (new conversation), clear messages immediately
-        if (conversationId === null) {
-          set({ 
-            currentConversationId: null, 
-            messages: [], 
-            currentCitations: [],
-            streamingText: '',
-            streamingConversationId: null,
-            reasoningSteps: [],
-            isReasoning: false,
-          });
-          return;
-        }
-        
-        // Load messages for the new conversation
-        const newMessages = messagesById[conversationId] || [];
-        
-        set({ 
-          currentConversationId: conversationId, 
-          messages: newMessages, 
+        set({
+          currentConversationId: conversationId,
           currentCitations: [],
-          streamingText: '',
+          selectedCitationId: null,
           streamingConversationId: null,
-          reasoningSteps: [],
-          isReasoning: false,
         });
       },
-      
-      setMessages: (messages) => set({ messages }),
-      
+
       addMessage: (message) => set((state) => {
-        const newMessages = [...state.messages, message];
         const conversationId = message.conversationId || state.currentConversationId;
-        
-        // Also update messagesById
-        const updatedMessagesById = conversationId
-          ? { ...state.messagesById, [conversationId]: newMessages }
-          : state.messagesById;
-        
-        return { 
-          messages: newMessages,
-          messagesById: updatedMessagesById,
+        if (!conversationId) {
+          return state;
+        }
+        const updatedMessages = [
+          ...(state.messagesById[conversationId] || []),
+          message,
+        ];
+
+        return {
+          messagesById: {
+            ...state.messagesById,
+            [conversationId]: updatedMessages,
+          },
         };
       }),
-      
-      updateLastMessage: (content) => set((state) => {
-        const messages = [...state.messages];
-        if (messages.length > 0) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], content };
-        }
-        
-        // Update in messagesById too
-        const conversationId = state.currentConversationId;
-        const updatedMessagesById = conversationId
-          ? { ...state.messagesById, [conversationId]: messages }
-          : state.messagesById;
-        
-        return { messages, messagesById: updatedMessagesById };
-      }),
-      
+
       startStreaming: (abortController, conversationId) => set({
         isStreaming: true,
-        streamingText: '',
         streamingConversationId: conversationId,
         abortController,
-        reasoningSteps: [],
-        isReasoning: true,
       }),
-      setStreamingStatus: (streamingStatus, conversationId) => set((state) => (
-        state.streamingConversationId === conversationId ? { streamingStatus } : {}
-      )),
-      appendStreamingText: (text, conversationId) => set((state) => (
-        state.streamingConversationId === conversationId
-          ? { streamingText: state.streamingText + text }
-          : {}
-      )),
       stopStreaming: (conversationId) => {
         const { abortController, streamingConversationId } = get();
         if (streamingConversationId && streamingConversationId !== conversationId) {
@@ -266,23 +188,16 @@ export const useChatStore = create<ChatState>()(
         }
         set({
           isStreaming: false,
-          streamingStatus: 'idle',
-          streamingText: '',
           streamingConversationId: null,
           abortController: null,
-          isReasoning: false,
         });
       },
-      
-      addReasoningStep: (step) => set((state) => ({ reasoningSteps: [...state.reasoningSteps, step] })),
-      clearReasoning: () => set({ reasoningSteps: [], isReasoning: false }),
-      setIsReasoning: (isReasoning) => set({ isReasoning }),
-      
+
       setCitations: (currentCitations, conversationId) => set((state) => (
         state.streamingConversationId === conversationId ? { currentCitations } : {}
       )),
       selectCitation: (selectedCitationId) => set({ selectedCitationId }),
-      
+
       setSourceSettings: (settings) => set((state) => ({
         sourceSettings: { ...state.sourceSettings, ...settings }
       })),
@@ -290,35 +205,27 @@ export const useChatStore = create<ChatState>()(
         ragSettings: { ...state.ragSettings, ...settings }
       })),
       setSelectedDocIds: (selectedDocIds) => set({ selectedDocIds }),
-      
-      clearChat: () => set({ 
+
+      clearChat: () => set({
         currentConversationId: null,
-        messages: [], 
-        currentCitations: [], 
+        currentCitations: [],
         selectedCitationId: null,
-        streamingText: '',
         streamingConversationId: null,
         isStreaming: false,
-        streamingStatus: 'idle',
-        reasoningSteps: [],
-        isReasoning: false,
+        abortController: null,
       }),
-      
+
       clearUserData: () => set({
         currentConversationId: null,
-        messages: [],
         messagesById: {},
         currentCitations: [],
         selectedCitationId: null,
-        streamingText: '',
         streamingConversationId: null,
         isStreaming: false,
-        streamingStatus: 'idle',
-        reasoningSteps: [],
-        isReasoning: false,
+        abortController: null,
         selectedDocIds: [],
       }),
-      
+
       deleteConversationMessages: (conversationId) => set((state) => {
         const newMessagesById = { ...state.messagesById };
         delete newMessagesById[conversationId];

@@ -17,7 +17,7 @@ export interface SourcesPanelState {
 
 export interface ChatState {
   isStreaming: boolean;
-  streamingStatus?: 'searching_pdfs' | 'searching_memory' | 'generating';
+  streamingConversationId?: string;
   abortController?: AbortController;
 }
 

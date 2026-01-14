@@ -14,6 +14,7 @@ import type { ModelSettings } from '@/types';
 // ============================================
 const N8N_BASE_URL = import.meta.env.VITE_N8N_WEBHOOK_BASE_URL || '/api';
 const N8N_CHAT_WEBHOOK_URL = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL || '';
+const N8N_RECEIVER_BASE_URL = import.meta.env.VITE_N8N_RECEIVER_BASE_URL || '/api/n8n';
 
 const N8N_WEBHOOK_PREFIX = /^\/webhook(-test)?(\/|$)/;
 
@@ -74,6 +75,17 @@ function getN8nRequestUrl(endpoint: string): string {
   return `${baseUrl}${endpoint}`;
 }
 
+function getN8nReceiverBaseUrl(): string {
+  return resolveN8nBaseUrl(N8N_RECEIVER_BASE_URL);
+}
+
+function getN8nReceiverUrl(endpoint: string): string {
+  if (/^https?:\/\//i.test(endpoint)) {
+    return endpoint;
+  }
+  return `${getN8nReceiverBaseUrl()}${endpoint}`;
+}
+
 // ============================================
 // Types
 // ============================================
@@ -120,6 +132,18 @@ export interface Citation {
   score?: number;
 }
 
+export type StreamEvent = {
+  type?: string;
+  content?: string;
+  citations?: Citation[];
+  status?: string;
+  message?: string;
+  clientRequestId?: string;
+  conversationId?: string;
+  messageId?: string;
+  [key: string]: unknown;
+};
+
 export interface ChatRequest {
   message: string;
   conversationId?: string;
@@ -155,8 +179,8 @@ export class N8NError extends Error {
 // ============================================
 // Base Request Function
 // ============================================
-async function n8nPost<T>(
-  endpoint: string,
+async function n8nPostToUrl<T>(
+  url: string,
   payload: Partial<N8NRequestPayload>,
   actor: { userId: string; username: string; role: string },
   workspaceId?: string,
@@ -172,7 +196,7 @@ async function n8nPost<T>(
     ...(keycloakToken && { keycloakToken }),
   };
 
-  const response = await fetch(getN8nRequestUrl(endpoint), {
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -192,6 +216,22 @@ async function n8nPost<T>(
   }
 
   return response.json();
+}
+
+async function n8nPost<T>(
+  endpoint: string,
+  payload: Partial<N8NRequestPayload>,
+  actor: { userId: string; username: string; role: string },
+  workspaceId?: string,
+  signal?: AbortSignal
+): Promise<N8NResponse<T>> {
+  return n8nPostToUrl<T>(
+    getN8nRequestUrl(endpoint),
+    payload,
+    actor,
+    workspaceId,
+    signal
+  );
 }
 
 // ============================================
@@ -473,7 +513,7 @@ export async function streamChat(
     ...(request.model && { model: request.model }),
   };
 
-  const isMatchingEvent = (event: Record<string, unknown>): boolean => {
+  const isMatchingEvent = (event: StreamEvent): boolean => {
     const eventRequestId =
       typeof event.clientRequestId === 'string' ? event.clientRequestId : undefined;
     if (eventRequestId && eventRequestId !== clientRequestId) return false;
@@ -487,7 +527,7 @@ export async function streamChat(
     return true;
   };
 
-  const getEventMeta = (event: Record<string, unknown>): StreamMeta => ({
+  const getEventMeta = (event: StreamEvent): StreamMeta => ({
     clientRequestId:
       typeof event.clientRequestId === 'string' ? event.clientRequestId : clientRequestId,
     conversationId:
@@ -538,7 +578,7 @@ export async function streamChat(
           }
 
           try {
-            const event = JSON.parse(data) as Record<string, any>;
+            const event = JSON.parse(data) as StreamEvent;
             if (!isMatchingEvent(event)) {
               continue;
             }
@@ -549,19 +589,29 @@ export async function streamChat(
                 callbacks.onMeta?.(eventMeta);
                 break;
               case 'token':
-                callbacks.onToken?.(event.content);
+                if (typeof event.content === 'string') {
+                  callbacks.onToken?.(event.content);
+                }
                 break;
               case 'citations':
-                callbacks.onCitations?.(event.citations);
+                if (Array.isArray(event.citations)) {
+                  callbacks.onCitations?.(event.citations);
+                }
                 break;
               case 'status':
-                callbacks.onStatus?.(event.status);
+                if (typeof event.status === 'string') {
+                  callbacks.onStatus?.(event.status);
+                }
                 break;
               case 'reasoning':
-                callbacks.onReasoning?.(event.content);
+                if (typeof event.content === 'string') {
+                  callbacks.onReasoning?.(event.content);
+                }
                 break;
               case 'error':
-                callbacks.onError?.(event.message);
+                if (typeof event.message === 'string') {
+                  callbacks.onError?.(event.message);
+                }
                 break;
               case 'done':
                 callbacks.onDone?.(eventMeta);
@@ -586,24 +636,98 @@ export async function streamChat(
 // ============================================
 // Non-streaming Chat Fallback
 // ============================================
+const RESPONSE_POLL_TIMEOUT_MS = 25000;
+const RESPONSE_MAX_WAIT_MS = 120000;
+
+async function waitForChatResponse(
+  clientRequestId: string,
+  conversationId: string | undefined,
+  workspaceId: string,
+  signal?: AbortSignal
+): Promise<N8NResponse<ChatResponseData>> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < RESPONSE_MAX_WAIT_MS) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+
+    const response = await fetch(getN8nReceiverUrl('/chat/response/poll'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientRequestId,
+        conversationId,
+        workspaceId,
+        timeoutMs: RESPONSE_POLL_TIMEOUT_MS,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new N8NError(
+        errorText || 'Response poll failed',
+        response.status,
+        errorText
+      );
+    }
+
+    const payload = (await response.json()) as N8NResponse<ChatResponseData>;
+    if (payload.success) {
+      return payload;
+    }
+
+    if (payload.error === 'timeout' || payload.message === 'timeout') {
+      continue;
+    }
+
+    return payload;
+  }
+
+  return {
+    success: false,
+    error: 'timeout',
+    message: 'Timed out waiting for chat response.',
+  };
+}
+
 export async function sendChat(
   request: ChatRequest,
   actor: { userId: string; username: string; role: string },
   signal?: AbortSignal
 ): Promise<N8NResponse<ChatResponseData>> {
-  return n8nPost<ChatResponseData>(
+  const clientRequestId = request.clientRequestId || uuidv4();
+  const initialResponse = await n8nPost<ChatResponseData>(
     '/chat',
     {
       context: 'message',
       message: request.message,
       conversationId: request.conversationId,
-      clientRequestId: request.clientRequestId,
+      clientRequestId,
       docIds: request.docIds,
       usePdfs: request.usePdfs,
       useMemory: request.useMemory,
       ...(request.model && { model: request.model }),
     },
     actor,
+    request.workspaceId,
+    signal
+  );
+
+  if (!initialResponse.success) {
+    return initialResponse;
+  }
+
+  if (initialResponse.data?.content) {
+    return initialResponse;
+  }
+
+  return waitForChatResponse(
+    clientRequestId,
+    request.conversationId,
     request.workspaceId,
     signal
   );
