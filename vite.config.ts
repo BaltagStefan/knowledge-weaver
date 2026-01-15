@@ -22,7 +22,7 @@ const resolveN8nProxyTarget = (env: Record<string, string>): string => {
 };
 
 const resolveN8nReceiverProxyTarget = (env: Record<string, string>): string => {
-  return env.VITE_N8N_RECEIVER_URL || "http://localhost:8787";
+  return env.VITE_N8N_RECEIVER_URL || "http://localhost:8788";
 };
 
 // https://vitejs.dev/config/
