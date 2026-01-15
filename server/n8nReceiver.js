@@ -15,6 +15,7 @@ const responses = new Map();
 const responsesByConversation = new Map();
 const waiters = new Map();
 const waitersByConversation = new Map();
+const allWaiters = new Set();
 
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const toString = (value) => (typeof value === 'string' ? value : undefined);
@@ -101,12 +102,19 @@ const normalizeIncomingResponse = (body) => {
     error: toString(envelope.error),
     message: toString(envelope.message),
   };
-
+  
   return { ok: true, clientRequestId, payload: normalized };
 };
 
 const registerWaiter = (clientRequestId, conversationId, res, timeoutMs, corsHeaders) => {
-  const waiter = { res, corsHeaders, timer: null, cleanup: null };
+  const waiter = {
+    clientRequestId,
+    conversationId,
+    res,
+    corsHeaders,
+    timer: null,
+    cleanup: null,
+  };
 
   const cleanupWaiter = () => {
     if (waiter.timer) clearTimeout(waiter.timer);
@@ -126,6 +134,7 @@ const registerWaiter = (clientRequestId, conversationId, res, timeoutMs, corsHea
         }
       }
     }
+    allWaiters.delete(waiter);
   };
 
   waiter.cleanup = cleanupWaiter;
@@ -146,6 +155,8 @@ const registerWaiter = (clientRequestId, conversationId, res, timeoutMs, corsHea
     convoGroup.add(waiter);
     waitersByConversation.set(conversationId, convoGroup);
   }
+
+  allWaiters.add(waiter);
 };
 
 const resolveWaiters = (clientRequestId, payload) => {
@@ -176,6 +187,25 @@ const resolveConversationWaiters = (conversationId, payload) => {
   return true;
 };
 
+const resolveSingleWaiter = (payload) => {
+  if (allWaiters.size !== 1) return false;
+  const waiter = allWaiters.values().next().value;
+  if (!waiter) return false;
+  if (waiter.timer) clearTimeout(waiter.timer);
+  const payloadWithRequestId = waiter.clientRequestId
+    ? {
+        ...payload,
+        data: {
+          ...(payload?.data || {}),
+          clientRequestId: waiter.clientRequestId,
+        },
+      }
+    : payload;
+  sendJson(waiter.res, 200, payloadWithRequestId, waiter.corsHeaders);
+  waiter.cleanup?.();
+  return true;
+};
+
 const storeResponse = (clientRequestId, payload) => {
   const createdAt = Date.now();
   responses.set(clientRequestId, { payload, createdAt });
@@ -200,6 +230,14 @@ const storeResponse = (clientRequestId, payload) => {
   if (conversationId && resolveConversationWaiters(conversationId, payload)) {
     responses.delete(clientRequestId);
     responsesByConversation.delete(conversationId);
+    return;
+  }
+
+  if (resolveSingleWaiter(payload)) {
+    responses.delete(clientRequestId);
+    if (conversationId) {
+      responsesByConversation.delete(conversationId);
+    }
   }
 };
 
