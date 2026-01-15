@@ -739,6 +739,9 @@ async function waitForChatResponse(
     }
 
     const payload = await parseN8nResponse<ChatResponseData>(response);
+    if (import.meta.env.DEV) {
+      console.log('[n8n-receiver] poll response:', payload);
+    }
     if (payload.success) {
       return payload;
     }
