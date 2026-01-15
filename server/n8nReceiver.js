@@ -333,6 +333,26 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      if (responses.size === 1) {
+        const entry = responses.values().next().value;
+        const payloadWithRequestId = clientRequestId
+          ? {
+              ...entry.payload,
+              data: {
+                ...(entry.payload?.data || {}),
+                clientRequestId,
+              },
+            }
+          : entry.payload;
+        const entryConversationId = toString(entry.payload?.data?.conversationId);
+        responses.clear();
+        if (entryConversationId) {
+          responsesByConversation.delete(entryConversationId);
+        }
+        sendJson(res, 200, payloadWithRequestId, corsHeaders);
+        return;
+      }
+
       const parsedTimeout = Number.parseInt(
         String(body.timeoutMs ?? POLL_TIMEOUT_MS_DEFAULT),
         10
