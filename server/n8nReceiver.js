@@ -12,7 +12,9 @@ const POLL_TIMEOUT_MS_DEFAULT = 25000;
 const POLL_TIMEOUT_MS_MAX = 30000;
 
 const responses = new Map();
+const responsesByConversation = new Map();
 const waiters = new Map();
+const waitersByConversation = new Map();
 
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const toString = (value) => (typeof value === 'string' ? value : undefined);
@@ -103,8 +105,8 @@ const normalizeIncomingResponse = (body) => {
   return { ok: true, clientRequestId, payload: normalized };
 };
 
-const registerWaiter = (clientRequestId, res, timeoutMs, corsHeaders) => {
-  const waiter = { res, corsHeaders, timer: null };
+const registerWaiter = (clientRequestId, conversationId, res, timeoutMs, corsHeaders) => {
+  const waiter = { res, corsHeaders, timer: null, cleanup: null };
 
   const cleanupWaiter = () => {
     if (waiter.timer) clearTimeout(waiter.timer);
@@ -115,7 +117,18 @@ const registerWaiter = (clientRequestId, res, timeoutMs, corsHeaders) => {
         waiters.delete(clientRequestId);
       }
     }
+    if (conversationId) {
+      const convoGroup = waitersByConversation.get(conversationId);
+      if (convoGroup) {
+        convoGroup.delete(waiter);
+        if (convoGroup.size === 0) {
+          waitersByConversation.delete(conversationId);
+        }
+      }
+    }
   };
+
+  waiter.cleanup = cleanupWaiter;
 
   waiter.timer = setTimeout(() => {
     sendJson(res, 200, { success: false, error: 'timeout', message: 'timeout' }, corsHeaders);
@@ -127,6 +140,12 @@ const registerWaiter = (clientRequestId, res, timeoutMs, corsHeaders) => {
   const group = waiters.get(clientRequestId) || new Set();
   group.add(waiter);
   waiters.set(clientRequestId, group);
+
+  if (conversationId) {
+    const convoGroup = waitersByConversation.get(conversationId) || new Set();
+    convoGroup.add(waiter);
+    waitersByConversation.set(conversationId, convoGroup);
+  }
 };
 
 const resolveWaiters = (clientRequestId, payload) => {
@@ -136,16 +155,51 @@ const resolveWaiters = (clientRequestId, payload) => {
   for (const waiter of group) {
     if (waiter.timer) clearTimeout(waiter.timer);
     sendJson(waiter.res, 200, payload, waiter.corsHeaders);
+    waiter.cleanup?.();
   }
 
   waiters.delete(clientRequestId);
   return true;
 };
 
+const resolveConversationWaiters = (conversationId, payload) => {
+  const group = waitersByConversation.get(conversationId);
+  if (!group) return false;
+
+  for (const waiter of group) {
+    if (waiter.timer) clearTimeout(waiter.timer);
+    sendJson(waiter.res, 200, payload, waiter.corsHeaders);
+    waiter.cleanup?.();
+  }
+
+  waitersByConversation.delete(conversationId);
+  return true;
+};
+
 const storeResponse = (clientRequestId, payload) => {
-  responses.set(clientRequestId, { payload, createdAt: Date.now() });
+  const createdAt = Date.now();
+  responses.set(clientRequestId, { payload, createdAt });
+
+  const conversationId = toString(payload?.data?.conversationId);
+  if (conversationId) {
+    responsesByConversation.set(conversationId, {
+      payload,
+      createdAt,
+      clientRequestId,
+    });
+  }
+
   if (resolveWaiters(clientRequestId, payload)) {
     responses.delete(clientRequestId);
+    if (conversationId) {
+      responsesByConversation.delete(conversationId);
+    }
+    return;
+  }
+
+  if (conversationId && resolveConversationWaiters(conversationId, payload)) {
+    responses.delete(clientRequestId);
+    responsesByConversation.delete(conversationId);
   }
 };
 
@@ -154,6 +208,11 @@ setInterval(() => {
   for (const [key, value] of responses.entries()) {
     if (now - value.createdAt > RESPONSE_TTL_MS) {
       responses.delete(key);
+    }
+  }
+  for (const [key, value] of responsesByConversation.entries()) {
+    if (now - value.createdAt > RESPONSE_TTL_MS) {
+      responsesByConversation.delete(key);
     }
   }
 }, 60000).unref?.();
@@ -201,6 +260,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const clientRequestId = toString(body.clientRequestId);
+      const conversationId = toString(body.conversationId);
 
       if (!clientRequestId) {
         sendJson(res, 400, { success: false, error: 'missing_clientRequestId' }, corsHeaders);
@@ -214,6 +274,27 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      if (conversationId) {
+        const byConversation = responsesByConversation.get(conversationId);
+        if (byConversation) {
+          responsesByConversation.delete(conversationId);
+          if (byConversation.clientRequestId) {
+            responses.delete(byConversation.clientRequestId);
+          }
+          const payloadWithRequestId = clientRequestId
+            ? {
+                ...byConversation.payload,
+                data: {
+                  ...(byConversation.payload?.data || {}),
+                  clientRequestId,
+                },
+              }
+            : byConversation.payload;
+          sendJson(res, 200, payloadWithRequestId, corsHeaders);
+          return;
+        }
+      }
+
       const parsedTimeout = Number.parseInt(
         String(body.timeoutMs ?? POLL_TIMEOUT_MS_DEFAULT),
         10
@@ -222,7 +303,7 @@ const server = http.createServer(async (req, res) => {
         ? Math.min(Math.max(parsedTimeout, 1000), POLL_TIMEOUT_MS_MAX)
         : POLL_TIMEOUT_MS_DEFAULT;
 
-      registerWaiter(clientRequestId, res, timeoutMs, corsHeaders);
+      registerWaiter(clientRequestId, conversationId, res, timeoutMs, corsHeaders);
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'invalid_payload';
