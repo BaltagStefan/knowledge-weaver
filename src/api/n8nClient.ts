@@ -17,6 +17,7 @@ const N8N_CHAT_WEBHOOK_URL = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL || '';
 const N8N_RECEIVER_BASE_URL = import.meta.env.VITE_N8N_RECEIVER_BASE_URL || '/api/n8n';
 
 const N8N_WEBHOOK_PREFIX = /^\/webhook(-test)?(\/|$)/;
+const WORKFLOW_STARTED_MESSAGE = 'workflow was started';
 
 const normalizeBaseUrl = (value: string): string =>
   value.trim().replace(/\/+$/, '');
@@ -50,6 +51,68 @@ const isFullWebhookUrl = (value: string): boolean => {
 
 const resolveN8nBaseUrl = (value: string): string =>
   toDevProxyPath(normalizeBaseUrl(value));
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const normalizeSuccessValue = (value: unknown): boolean | undefined => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return undefined;
+};
+
+const normalizeN8nResponse = <T>(payload: unknown): N8NResponse<T> => {
+  if (isRecord(payload)) {
+    const successValue = normalizeSuccessValue(payload.success);
+    if (successValue !== undefined) {
+      return { ...payload, success: successValue } as N8NResponse<T>;
+    }
+
+    const message = typeof payload.message === 'string' ? payload.message : undefined;
+    const error = typeof payload.error === 'string' ? payload.error : undefined;
+
+    if (error) {
+      return { ...payload, success: false } as N8NResponse<T>;
+    }
+
+    if (message && message.trim().toLowerCase() === WORKFLOW_STARTED_MESSAGE) {
+      return { ...payload, success: true } as N8NResponse<T>;
+    }
+
+    if ('data' in payload) {
+      return { ...payload, success: true } as N8NResponse<T>;
+    }
+
+    return { ...payload, success: false } as N8NResponse<T>;
+  }
+
+  if (typeof payload === 'string') {
+    const message = payload.trim();
+    if (message.toLowerCase() === WORKFLOW_STARTED_MESSAGE) {
+      return { success: true, message } as N8NResponse<T>;
+    }
+    return { success: false, message } as N8NResponse<T>;
+  }
+
+  return { success: false, message: 'Invalid response from n8n' } as N8NResponse<T>;
+};
+
+const parseN8nResponse = async <T>(response: Response): Promise<N8NResponse<T>> => {
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return { success: false, message: 'Empty response from n8n' } as N8NResponse<T>;
+  }
+  try {
+    return normalizeN8nResponse<T>(JSON.parse(trimmed));
+  } catch {
+    return normalizeN8nResponse<T>(trimmed);
+  }
+};
 
 // n8n webhook base URL
 function getN8nApiBaseUrl(): string {
@@ -215,7 +278,7 @@ async function n8nPostToUrl<T>(
     );
   }
 
-  return response.json();
+  return parseN8nResponse<T>(response);
 }
 
 async function n8nPost<T>(
@@ -675,7 +738,7 @@ async function waitForChatResponse(
       );
     }
 
-    const payload = (await response.json()) as N8NResponse<ChatResponseData>;
+    const payload = await parseN8nResponse<ChatResponseData>(response);
     if (payload.success) {
       return payload;
     }
