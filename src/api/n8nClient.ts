@@ -297,6 +297,44 @@ async function n8nPost<T>(
   );
 }
 
+async function appendConversationEventToMinio(
+  userId: string,
+  conversationId: string,
+  role: 'user' | 'assistant',
+  text: string,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(getN8nReceiverUrl('/chat/append'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      userId,
+      conversationId,
+      role,
+      text,
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new N8NError(
+      'Failed to persist conversation event',
+      response.status,
+      errorText
+    );
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (payload && payload.success === false) {
+    throw new N8NError(
+      payload.error || payload.message || 'Failed to persist conversation event'
+    );
+  }
+}
+
 // ============================================
 // Auth Endpoints
 // ============================================
@@ -765,13 +803,28 @@ export async function sendChat(
   actor: { userId: string; username: string; role: string },
   signal?: AbortSignal
 ): Promise<N8NResponse<ChatResponseData>> {
+  const conversationId = request.conversationId;
+  if (!conversationId) {
+    throw new N8NError('Missing conversationId for chat persistence');
+  }
+  if (!actor?.userId) {
+    throw new N8NError('Missing userId for chat persistence');
+  }
+
   const clientRequestId = request.clientRequestId || uuidv4();
+  await appendConversationEventToMinio(
+    actor.userId,
+    conversationId,
+    'user',
+    request.message,
+    signal
+  );
   const initialResponse = await n8nPost<ChatResponseData>(
     '/chat',
     {
       context: 'message',
       message: request.message,
-      conversationId: request.conversationId,
+      conversationId,
       clientRequestId,
       docIds: request.docIds,
       usePdfs: request.usePdfs,
@@ -787,14 +840,24 @@ export async function sendChat(
     return initialResponse;
   }
 
-  if (initialResponse.data?.content) {
-    return initialResponse;
+  const finalResponse = initialResponse.data?.content
+    ? initialResponse
+    : await waitForChatResponse(
+        clientRequestId,
+        conversationId,
+        request.workspaceId,
+        signal
+      );
+
+  if (finalResponse.success && finalResponse.data?.content) {
+    await appendConversationEventToMinio(
+      actor.userId,
+      conversationId,
+      'assistant',
+      finalResponse.data.content,
+      signal
+    );
   }
 
-  return waitForChatResponse(
-    clientRequestId,
-    request.conversationId,
-    request.workspaceId,
-    signal
-  );
+  return finalResponse;
 }

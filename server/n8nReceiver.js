@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { URL } from 'node:url';
+import { appendConversationEvent, ensureMinioConfig } from './minioStorage.js';
 
 const PORT = Number.parseInt(process.env.N8N_RECEIVER_PORT || '8788', 10);
 const RAW_ALLOWED_ORIGINS = process.env.N8N_RECEIVER_ALLOWED_ORIGINS || 'http://localhost:8080';
@@ -10,6 +11,8 @@ const MAX_BODY_BYTES = 1024 * 1024; // 1MB
 const RESPONSE_TTL_MS = 10 * 60 * 1000;
 const POLL_TIMEOUT_MS_DEFAULT = 25000;
 const POLL_TIMEOUT_MS_MAX = 30000;
+
+ensureMinioConfig();
 
 const responses = new Map();
 const responsesByConversation = new Map();
@@ -271,6 +274,34 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && pathname === '/api/n8n/health') {
     sendJson(res, 200, { ok: true }, corsHeaders);
     return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/n8n/chat/append') {
+    try {
+      const body = await readJsonBody(req);
+      const userId = toString(body.userId);
+      const conversationId = toString(body.conversationId);
+      const role = toString(body.role);
+      const text = toString(body.text);
+
+      if (!userId || !conversationId || !role || typeof text !== 'string') {
+        sendJson(res, 400, { success: false, error: 'missing_fields' }, corsHeaders);
+        return;
+      }
+
+      if (role !== 'user' && role !== 'assistant') {
+        sendJson(res, 400, { success: false, error: 'invalid_role' }, corsHeaders);
+        return;
+      }
+
+      await appendConversationEvent(userId, conversationId, role, text);
+      sendJson(res, 200, { success: true }, corsHeaders);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'append_failed';
+      sendJson(res, 500, { success: false, error: message }, corsHeaders);
+      return;
+    }
   }
 
   if (req.method === 'POST' && pathname === '/api/n8n/chat/response') {
