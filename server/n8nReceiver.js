@@ -2,7 +2,7 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import { appendConversationEvent, ensureMinioConfig } from './minioStorage.js';
 
-const PORT = Number.parseInt(process.env.N8N_RECEIVER_PORT || '8788', 10);
+const PORT = Number.parseInt(process.env.N8N_RECEIVER_PORT || '8787', 10);
 const RAW_ALLOWED_ORIGINS = process.env.N8N_RECEIVER_ALLOWED_ORIGINS || 'http://localhost:8080';
 const ALLOWED_ORIGINS = RAW_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
 const ALLOW_ALL_ORIGINS = ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.length === 0;
