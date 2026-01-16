@@ -335,6 +335,37 @@ async function appendConversationEventToMinio(
   }
 }
 
+export async function uploadUserFileToMinio(
+  userId: string,
+  file: File,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(getN8nReceiverUrl('/user/files/upload'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': file.type || 'application/pdf',
+      'X-User-Id': userId,
+      'X-File-Name': encodeURIComponent(file.name),
+    },
+    body: file,
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new N8NError(
+      'Failed to upload file',
+      response.status,
+      errorText
+    );
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (payload && payload.success === false) {
+    throw new N8NError(payload.error || payload.message || 'Failed to upload file');
+  }
+}
+
 // ============================================
 // Auth Endpoints
 // ============================================

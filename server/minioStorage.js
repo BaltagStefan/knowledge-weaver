@@ -192,3 +192,35 @@ export async function appendConversationEvent(userId, conversationId, role, text
 
   throw new Error('Failed to append conversation event after retries');
 }
+
+export async function uploadUserFile(userId, filename, contentType, body) {
+  if (!userId) {
+    throw new Error('uploadUserFile requires userId');
+  }
+  if (!filename) {
+    throw new Error('uploadUserFile requires filename');
+  }
+  if (!body) {
+    throw new Error('uploadUserFile requires body');
+  }
+
+  const safeName = path.basename(filename);
+  if (!safeName) {
+    throw new Error('uploadUserFile requires valid filename');
+  }
+
+  const config = loadMinioConfig();
+  const client = getMinioClient();
+  const key = `Users/${userId}/files/${safeName}`;
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType || 'application/pdf',
+    })
+  );
+
+  return { key };
+}

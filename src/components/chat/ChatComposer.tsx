@@ -7,7 +7,7 @@ import { validateMessage } from '@/lib/validation';
 import { VALIDATION } from '@/types';
 import type { Message } from '@/types';
 import { createFile, upsertIndexState } from '@/db/repo';
-import { filesApi } from '@/api/n8nClient';
+import { filesApi, uploadUserFileToMinio } from '@/api/n8nClient';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
@@ -28,6 +28,7 @@ import {
   Brain,
   ChevronDown,
   Upload,
+  X,
 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -41,14 +42,20 @@ interface ChatComposerProps {
 }
 
 const EMPTY_MESSAGES: Message[] = [];
+const pendingFileKey = (file: File) =>
+  `${file.name}-${file.size}-${file.lastModified}`;
 
 export function ChatComposer({ onSend, disabled = false, showSuggestions = true }: ChatComposerProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
   const [message, setMessage] = useState('');
   const [validation, setValidation] = useState(validateMessage(''));
   const [maliciousDialogOpen, setMaliciousDialogOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   
   const isStreaming = useChatStore((state) => state.isStreaming);
   const streamingConversationId = useChatStore((state) => state.streamingConversationId);
@@ -113,7 +120,7 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
     setValidation(validateMessage(value));
   }, []);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     if (isStreaming) {
       if (activeConversationId) {
         stopStreaming(activeConversationId);
@@ -122,18 +129,59 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
     }
     
     const trimmed = message.trim();
-    if (!trimmed || !validation.isValid || disabled) return;
+    if (!trimmed || !validation.isValid || disabled || isUploadingFiles) return;
+
+    if (pendingFiles.length > 0) {
+      if (!user) {
+        toast({
+          title: t('common.error'),
+          description: t('errors.generic'),
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setIsUploadingFiles(true);
+      try {
+        for (const file of pendingFiles) {
+          await uploadUserFileToMinio(user.id, file);
+        }
+        setPendingFiles([]);
+      } catch {
+        const firstName = pendingFiles[0]?.name || 'file';
+        toast({
+          title: t('files.uploadErrorTitle'),
+          description: t('files.uploadErrorDescription').replace('{filename}', firstName),
+          variant: 'destructive',
+        });
+        return;
+      } finally {
+        setIsUploadingFiles(false);
+      }
+    }
     
     onSend(trimmed);
     setMessage('');
     setValidation(validateMessage(''));
     textareaRef.current?.focus();
-  }, [activeConversationId, message, validation.isValid, disabled, isStreaming, stopStreaming, onSend]);
+  }, [
+    activeConversationId,
+    message,
+    validation.isValid,
+    disabled,
+    isStreaming,
+    stopStreaming,
+    onSend,
+    pendingFiles,
+    user,
+    isUploadingFiles,
+    t,
+  ]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   }, [handleSend]);
 
@@ -142,6 +190,97 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
     setValidation(validateMessage(suggestion));
     textareaRef.current?.focus();
   }, []);
+
+  const addPendingFiles = useCallback(async (filesToQueue: File[]) => {
+    if (!user) {
+      toast({
+        title: t('common.error'),
+        description: t('errors.generic'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const accepted: File[] = [];
+
+    for (const file of filesToQueue) {
+      const suspicious = await isPdfLikelyMalicious(file);
+      if (suspicious) {
+        setMaliciousDialogOpen(true);
+        continue;
+      }
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: t('files.uploadInvalidTitle'),
+          description: t('files.uploadInvalidDescription'),
+          variant: 'destructive',
+        });
+        continue;
+      }
+
+      if (file.size > VALIDATION.PDF_MAX_SIZE_BYTES) {
+        toast({
+          title: t('files.uploadErrorTitle'),
+          description: t('library.fileTooLarge'),
+          variant: 'destructive',
+        });
+        continue;
+      }
+
+      accepted.push(file);
+    }
+
+    if (accepted.length === 0) return;
+
+    setPendingFiles((prev) => {
+      const existingKeys = new Set(prev.map(pendingFileKey));
+      const next = [...prev];
+      for (const file of accepted) {
+        const key = pendingFileKey(file);
+        if (!existingKeys.has(key)) {
+          existingKeys.add(key);
+          next.push(file);
+        }
+      }
+      return next;
+    });
+  }, [user, t]);
+
+  const removePendingFile = useCallback((fileToRemove: File) => {
+    setPendingFiles((prev) =>
+      prev.filter((file) => pendingFileKey(file) !== pendingFileKey(fileToRemove))
+    );
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepthRef.current -= 1;
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0;
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragging(false);
+    const filesToQueue = Array.from(e.dataTransfer.files || []);
+    if (filesToQueue.length > 0) {
+      await addPendingFiles(filesToQueue);
+    }
+  }, [addPendingFiles]);
 
   const toggleDocSelection = (docId: string) => {
     setSelectedDocIds(
@@ -319,7 +458,18 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
   }, [handleUploadFiles]);
 
   return (
-    <div className="border-t bg-background">
+    <div
+      className="border-t bg-background relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 text-sm text-muted-foreground pointer-events-none">
+          {t('files.uploadDrop')}
+        </div>
+      )}
       <div className="max-w-3xl mx-auto p-4">
         {/* Quick Suggestions */}
         {showQuickSuggestions && (
@@ -435,6 +585,28 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
           </div>
         )}
 
+        {pendingFiles.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {pendingFiles.map((file) => (
+              <div
+                key={pendingFileKey(file)}
+                className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1"
+              >
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs max-w-[220px] truncate">{file.name}</span>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => removePendingFile(file)}
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Input area */}
         <div className="relative flex items-end gap-2">
           <div className="flex-1 relative">
@@ -464,7 +636,7 @@ export function ChatComposer({ onSend, disabled = false, showSuggestions = true 
 
           <Button
             onClick={handleSend}
-            disabled={!isStreaming && (!validation.isValid || disabled)}
+            disabled={!isStreaming && (!validation.isValid || disabled || isUploadingFiles)}
             size="icon"
             className={cn(
               "h-[52px] w-[52px] rounded-xl shrink-0 transition-all duration-200",

@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { URL } from 'node:url';
-import { appendConversationEvent, ensureMinioConfig } from './minioStorage.js';
+import { appendConversationEvent, ensureMinioConfig, uploadUserFile } from './minioStorage.js';
 
 const PORT = Number.parseInt(process.env.N8N_RECEIVER_PORT || '8787', 10);
 const RAW_ALLOWED_ORIGINS = process.env.N8N_RECEIVER_ALLOWED_ORIGINS || 'http://localhost:8080';
@@ -8,6 +8,7 @@ const ALLOWED_ORIGINS = RAW_ALLOWED_ORIGINS.split(',').map((origin) => origin.tr
 const ALLOW_ALL_ORIGINS = ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.length === 0;
 
 const MAX_BODY_BYTES = 1024 * 1024; // 1MB
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB
 const RESPONSE_TTL_MS = 10 * 60 * 1000;
 const POLL_TIMEOUT_MS_DEFAULT = 25000;
 const POLL_TIMEOUT_MS_MAX = 30000;
@@ -26,7 +27,7 @@ const toString = (value) => (typeof value === 'string' ? value : undefined);
 const getCorsHeaders = (origin) => {
   const headers = {
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-User-Id,X-File-Name',
   };
 
   if (ALLOW_ALL_ORIGINS) {
@@ -79,6 +80,33 @@ const readJsonBody = (req) => new Promise((resolve, reject) => {
 
   req.on('error', reject);
 });
+
+const readBinaryBody = (req, maxBytes) => new Promise((resolve, reject) => {
+  const chunks = [];
+  let size = 0;
+
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > maxBytes) {
+      reject(new Error('payload_too_large'));
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+
+  req.on('end', () => {
+    resolve(Buffer.concat(chunks));
+  });
+
+  req.on('error', reject);
+});
+
+const getHeaderValue = (value) => {
+  if (!value) return undefined;
+  if (Array.isArray(value)) return value[0];
+  return typeof value === 'string' ? value : undefined;
+};
 
 const normalizeIncomingResponse = (body) => {
   if (!isObject(body)) {
@@ -300,6 +328,47 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'append_failed';
       sendJson(res, 500, { success: false, error: message }, corsHeaders);
+      return;
+    }
+  }
+
+  if (req.method === 'POST' && pathname === '/api/n8n/user/files/upload') {
+    try {
+      const userId = getHeaderValue(req.headers['x-user-id']);
+      const rawFileName = getHeaderValue(req.headers['x-file-name']);
+      const contentType = getHeaderValue(req.headers['content-type']);
+      let fileName;
+
+      try {
+        fileName = rawFileName ? decodeURIComponent(rawFileName) : undefined;
+      } catch {
+        sendJson(res, 400, { success: false, error: 'invalid_filename' }, corsHeaders);
+        return;
+      }
+
+      if (!userId || !fileName) {
+        sendJson(res, 400, { success: false, error: 'missing_fields' }, corsHeaders);
+        return;
+      }
+
+      if (contentType && !contentType.startsWith('application/pdf')) {
+        sendJson(res, 400, { success: false, error: 'invalid_content_type' }, corsHeaders);
+        return;
+      }
+
+      const body = await readBinaryBody(req, MAX_FILE_BYTES);
+      if (!body || body.length === 0) {
+        sendJson(res, 400, { success: false, error: 'empty_file' }, corsHeaders);
+        return;
+      }
+
+      const result = await uploadUserFile(userId, fileName, contentType, body);
+      sendJson(res, 200, { success: true, key: result.key }, corsHeaders);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'upload_failed';
+      const status = message === 'payload_too_large' ? 413 : 500;
+      sendJson(res, status, { success: false, error: message }, corsHeaders);
       return;
     }
   }
