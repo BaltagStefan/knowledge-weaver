@@ -329,7 +329,7 @@ VITE_N8N_WEBHOOK_BASE_URL=https://your-n8n-instance.com/webhook
 # n8n Receiver (callback) pentru rŽŸspunsuri
 # Backend-ul care primeÔTte POST-urile de la n8n
 VITE_N8N_RECEIVER_BASE_URL=/api/n8n
-VITE_N8N_RECEIVER_URL=http://localhost:8787
+VITE_N8N_RECEIVER_URL=http://localhost:8788
 
 # Keycloak Configuration
 VITE_KEYCLOAK_URL=https://your-keycloak.com
@@ -346,7 +346,7 @@ VITE_DEFAULT_THEME=system`}
             configs={[
               { placeholder: 'https://your-n8n-instance.com/webhook', description: 'URL-ul instanței tale n8n (ex: https://n8n.compania.ro/webhook)' },
               { placeholder: '/api/n8n', description: 'Base URL folosit de frontend pentru receiver (prin proxy Vite)' },
-              { placeholder: 'http://localhost:8787', description: 'URL-ul backend-ului receiver (folosit de proxy-ul Vite)' },
+              { placeholder: 'http://localhost:8788', description: 'URL-ul backend-ului receiver (folosit de proxy-ul Vite)' },
               { placeholder: 'https://your-keycloak.com', description: 'URL-ul instanței Keycloak (ex: https://auth.compania.ro)' },
               { placeholder: 'your-realm-name', description: 'Numele realm-ului creat în Keycloak (ex: rag-chat)' },
               { placeholder: 'your-client-id', description: 'Client ID din Keycloak (ex: rag-chat-app)' },
@@ -705,7 +705,7 @@ Content-Type: application/json
 
           <CodeBlock
             code={`// n8n -> Backend receiver
-POST http://localhost:8787/api/n8n/chat/response
+POST http://localhost:8788/api/n8n/chat/response
 Content-Type: application/json
 
 {

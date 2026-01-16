@@ -211,7 +211,7 @@ VITE_N8N_WEBHOOK_BASE_URL=https://your-n8n-instance.com/webhook
 # ============================================
 # Backend-ul care primeste POST-urile de raspuns
 VITE_N8N_RECEIVER_BASE_URL=/api/n8n
-VITE_N8N_RECEIVER_URL=http://localhost:8787
+VITE_N8N_RECEIVER_URL=http://localhost:8788
 
 # ============================================
 # OPȚIONAL - Keycloak SSO
@@ -231,7 +231,7 @@ VITE_DEFAULT_THEME=system`}
                   configs={[
                     { placeholder: 'https://your-n8n-instance.com/webhook', description: 'URL-ul instanței tale n8n (ex: https://n8n.compania.ro/webhook sau http://localhost:5678/webhook)' },
                     { placeholder: '/api/n8n', description: 'Base URL folosit de frontend pentru receiver (prin proxy Vite)' },
-                    { placeholder: 'http://localhost:8787', description: 'URL-ul backend-ului receiver (folosit de proxy-ul Vite)' },
+                    { placeholder: 'http://localhost:8788', description: 'URL-ul backend-ului receiver (folosit de proxy-ul Vite)' },
                     { placeholder: 'https://your-keycloak.com', description: 'URL-ul Keycloak (opțional, doar dacă folosești SSO)' },
                     { placeholder: 'your-realm', description: 'Numele realm-ului din Keycloak' },
                     { placeholder: 'kotaemon-frontend', description: 'Client ID configurat în Keycloak' },
@@ -351,7 +351,7 @@ const { message, conversationId, clientRequestId } = $input.first().json;
 const content = await generateAnswer(message);
 
 // 4. HTTP REQUEST - Trimite raspunsul catre receiver
-POST http://localhost:8787/api/n8n/chat/response
+POST http://localhost:8788/api/n8n/chat/response
 {
   "success": true,
   "data": {
@@ -363,7 +363,7 @@ POST http://localhost:8787/api/n8n/chat/response
                     language="javascript"
                     title="n8n-chat-response-workflow.js"
                     configs={[
-                      { placeholder: 'http://localhost:8787', description: 'URL-ul backend-ului receiver (portul implicit)' },
+                      { placeholder: 'http://localhost:8788', description: 'URL-ul backend-ului receiver (portul implicit)' },
                     ]}
                   />
                 </div>
